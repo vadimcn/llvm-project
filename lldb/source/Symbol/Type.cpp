@@ -747,6 +747,13 @@ TypeAndOrName::TypeAndOrName(const char *in_type_str)
 TypeAndOrName::TypeAndOrName(ConstString &in_type_const_string)
     : m_type_name(in_type_const_string) {}
 
+TypeAndOrName::TypeAndOrName(const CompilerType &type)
+    : m_compiler_type(type)
+{
+  if (m_compiler_type)
+    m_type_name = m_compiler_type.GetTypeName();
+}
+
 bool TypeAndOrName::operator==(const TypeAndOrName &other) const {
   if (m_compiler_type != other.m_compiler_type)
     return false;
