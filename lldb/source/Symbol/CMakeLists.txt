@@ -25,6 +25,7 @@ add_lldb_library(lldbSymbol
   ObjectContainer.cpp
   ObjectFile.cpp
   PostfixExpression.cpp
+  RustASTContext.cpp
   Symbol.cpp
   SymbolContext.cpp
   SymbolFile.cpp
