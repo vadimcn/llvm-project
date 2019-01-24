@@ -1,0 +1,205 @@
+variables:
+  LLVM_VERSION_SUFFIX: '-custom'
+
+jobs:
+- job: Linux
+  pool:
+    vmImage: 'Ubuntu 16.04'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      cat /proc/cpuinfo
+      cat /proc/meminfo
+    displayName: 'Info'
+    
+  - script: |
+      sudo apt-get install swig3.0 libedit-dev
+      mkdir build
+      cd build
+      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo\
+            -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
+            -DLLVM_PARALLEL_LINK_JOBS=1\
+            -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
+            -DLLVM_TARGETS_TO_BUILD=X86\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
+            -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLDB_DISABLE_CURSES=TRUE\
+            -DLLDB_DISABLE_LIBEDIT=TRUE\
+            $(Build.SourcesDirectory)/llvm
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build build --target lldb -- -j4
+    displayName: 'Build'
+
+  - script: |
+      cd build
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb-linux.zip\
+        bin/lldb\
+        bin/lldb-argdumper\
+        bin/lldb-server\
+        lib/liblldb.*\
+        lib/python2.7/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+ 
+  # - script: |
+  #     cmake --build build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      cat build/CMakeCache.txt
+      find build -type d
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: OSX
+  pool:
+    vmImage: 'macOS 10.13'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      sysctl -a
+    displayName: 'Info'
+    
+  - script: |
+      brew install swig
+      mkdir build
+      cd build
+      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo\
+            -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
+            -DLLVM_PARALLEL_LINK_JOBS=1\
+            -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
+            -DLLVM_TARGETS_TO_BUILD=X86\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
+            -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLDB_DISABLE_CURSES=TRUE\
+            -DLLDB_DISABLE_LIBEDIT=TRUE\
+            -DLLDB_USE_SYSTEM_DEBUGSERVER=TRUE\
+            $(Build.SourcesDirectory)/llvm
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build build --target lldb -- -j4
+      cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver build/bin/debugserver
+    displayName: 'Build'
+
+  - script: |
+      cd build
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb-osx.zip\
+        bin/lldb\
+        bin/lldb.dSYM\
+        bin/lldb-argdumper\
+        bin/lldb-argdumper.dSYM\
+        bin/debugserver\
+        lib/liblldb.*\
+        lib/liblldb.*.dSYM\
+        lib/python2.7/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+
+  # - script: |
+  #     cmake --build build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      cat build/CMakeCache.txt
+      find build -type d
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: Windows
+  pool:
+    vmImage: 'VS2017-Win2016'
+    
+  timeoutInMinutes: 360
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6'
+      addToPath: true
+      architecture: 'x64'
+
+  - script: |
+      curl -L http://prdownloads.sourceforge.net/swig/swigwin-3.0.12.zip -o %TEMP%/swig.zip
+      unzip %TEMP%/swig.zip -d %AGENT_BUILDDIRECTORY%
+      choco install ninja
+      choco install zip    
+    displayName: 'Install'
+
+  - task: BatchScript@1
+    inputs:
+      filename: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\VsDevCmd.bat"
+      arguments: -arch=amd64 -host_arch=amd64
+      modifyEnvironment: true
+    displayName: VsDevCmd    
+
+  - script: |
+      PATH %AGENT_BUILDDIRECTORY%\swigwin-3.0.12;%PATH%
+      mkdir build
+      cd build
+      cmake -GNinja^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+            -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}^
+            -DCMAKE_C_COMPILER=cl^
+            -DCMAKE_CXX_COMPILER=cl^
+            -DLLVM_PARALLEL_LINK_JOBS=1^
+            -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"^
+            -DLLVM_TARGETS_TO_BUILD=X86^
+            -DLLVM_ENABLE_DIA_SDK=TRUE^
+            -DPYTHON_HOME=%USEPYTHONVERSION_PYTHONLOCATION%^
+            -DLLDB_RELOCATABLE_PYTHON=TRUE^
+            -DLLVM_ENABLE_TERMINFO=FALSE^
+            -DLLDB_DISABLE_CURSES=TRUE^
+            -DLLDB_DISABLE_LIBEDIT=TRUE^
+            -DPYTHON_DEBUG_EXE=%USEPYTHONVERSION_PYTHONLOCATION%\python.exe^
+            -DPYTHON_DEBUG_DLL=%USEPYTHONVERSION_PYTHONLOCATION%\python36.dll^
+            -DPYTHON_DEBUG_LIB=%USEPYTHONVERSION_PYTHONLOCATION%\libs\python36.lib^
+            $(Build.SourcesDirectory)/llvm
+    displayName: 'Configure'
+
+  - script: |
+      cmake --build build --target lldb -- -j4
+    displayName: 'Build'
+
+  - script: |
+      cd build
+      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb-windows.zip^
+        bin/lldb.*^
+        bin/lldb-argdumper.*^
+        bin/liblldb.*^
+        lib/liblldb.*^
+        lib/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+
+  # - script: |
+  #     cmake --build build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      set
+      type build\CMakeCache.txt
+      tree build
+    displayName: 'On Failure'
+    condition: failed()
