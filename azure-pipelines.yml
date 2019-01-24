@@ -1,0 +1,272 @@
+variables:
+  CMAKE_BUILD_TYPE: 'MinSizeRel'
+
+jobs:
+- job: Linux
+  pool:
+    vmImage: 'Ubuntu 16.04'
+
+  container: 'vadimcn/linux-builder:latest'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      cat /proc/cpuinfo
+      cat /proc/meminfo
+    displayName: 'Info'
+
+  - task: CacheBeta@0
+    inputs:
+      key: ccache | $(Agent.OS) | $(Build.BuildId)
+      restoreKeys: |
+        ccache | $(Agent.OS) | $(Build.SourceVersion)
+        ccache | $(Agent.OS) 
+      path: $(Agent.BuildDirectory)/.ccache
+      continueOnError: true
+    displayName: CCache
+    condition: always()
+
+  - script: |
+      git remote set-url origin local
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
+         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+    displayName: 'Build'
+
+  - script: |
+      cd $(Agent.BuildDirectory)/lldb
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-unknown-linux-gnu.zip\
+        bin/lldb\
+        bin/lldb-argdumper\
+        bin/lldb-server\
+        lib/liblldb.*\
+        lib/python3*/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+ 
+  # - script: |
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      find $(Agent.BuildDirectory) -type d
+      cat $(Agent.BuildDirectory)/CMakeCache.txt
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: Linux_aarch64
+  pool:
+    vmImage: 'Ubuntu 16.04'
+
+  container: 'vadimcn/linux-builder:latest'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      cat /proc/cpuinfo
+      cat /proc/meminfo
+    displayName: 'Info'
+
+  - task: CacheBeta@0
+    inputs:
+      key: ccache | $(Agent.OS) | $(Build.SourceVersion)
+      restoreKeys: |
+        ccache | $(Agent.OS) 
+      path: $(Agent.BuildDirectory)/.ccache
+      continueOnError: true
+    displayName: CCache
+    condition: always()
+   
+  - script: |
+      git remote set-url origin local
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
+          -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)\
+          -DCMAKE_SYSTEM_NAME=Linux\
+          -DCMAKE_SYSTEM_PROCESSOR=aarch64
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+    displayName: 'Build'
+
+  - script: |
+      cd $(Agent.BuildDirectory)/lldb
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--aarch64-unknown-linux-gnu.zip\
+        bin/lldb\
+        bin/lldb-argdumper\
+        bin/lldb-server\
+        lib/liblldb.*\
+        lib/python3*/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+ 
+  # - script: |
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      find $(Agent.BuildDirectory) -type d
+      cat $(Agent.BuildDirectory)/CMakeCache.txt
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: OSX
+  pool:
+    vmImage: 'macOS 10.13'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      sysctl -a
+    displayName: 'Info'
+
+  - script: |
+      brew install pcre automake ninja ccache
+    displayName: 'Install tools'
+
+  - task: CacheBeta@0
+    inputs:
+      key: ccache | $(Agent.OS) | $(Build.SourceVersion)
+      restoreKeys: |
+        ccache | $(Agent.OS) 
+      path: $(Agent.BuildDirectory)/.ccache
+      continueOnError: true
+    displayName: CCache
+    condition: always()
+
+  - script: |
+      git remote set-url origin local
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
+         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+      cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/lldb/bin/debugserver
+    displayName: 'Build'
+
+  - script: |
+      cd $(Agent.BuildDirectory)/lldb
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-apple-darwin.zip\
+        bin/lldb\
+        bin/lldb.dSYM\
+        bin/lldb-argdumper\
+        bin/lldb-argdumper.dSYM\
+        bin/debugserver\
+        lib/liblldb.*\
+        lib/liblldb.*.dSYM\
+        lib/python3*/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+
+  # - script: |
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      find $(Agent.BuildDirectory) -type d
+      cat $(Agent.BuildDirectory)/CMakeCache.txt
+      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: Windows
+  pool:
+    vmImage: 'VS2017-Win2016'
+    
+  timeoutInMinutes: 360
+
+  steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.6'
+      addToPath: true
+      architecture: 'x64'
+
+  - task: BatchScript@1
+    inputs:
+      filename: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\VsDevCmd.bat"
+      arguments: -arch=amd64 -host_arch=amd64
+      modifyEnvironment: true
+    displayName: VsDevCmd
+
+  - script: |
+      choco install zip
+      choco install ninja
+      choco install msys2 --params "/NoUpdate"
+      C:\tools\msys64\usr\bin\pacman --noconfirm -S automake autoconf 
+      C:\tools\msys64\usr\bin\pacman --noconfirm -S pcre-devel bison sed
+    displayName: 'Install tools'
+
+  - script: |
+      set PATH=C:\tools\msys64\usr\bin;%PATH%
+      set CPATH=C:\tools\msys64\usr\include
+      set LIBRARY_PATH=C:\tools\msys64\usr\lib
+      git remote set-url origin local
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)^
+         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+      type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+    displayName: 'Build'
+
+  - script: |
+      cd $(Agent.BuildDirectory)/lldb
+      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-pc-windows-msvc.zip^
+        bin/lldb.*^
+        bin/lldb-argdumper.*^
+        bin/liblldb.*^
+        lib/liblldb.*^
+        lib/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+
+  # - script: |
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      set
+      tree /a $(Agent.BuildDirectory)
+      type $(Agent.BuildDirectory)\CMakeCache.txt
+      type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
+    displayName: 'On Failure'
+    condition: failed()
