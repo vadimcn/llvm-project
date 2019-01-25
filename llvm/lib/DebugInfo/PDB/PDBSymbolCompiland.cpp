@@ -101,6 +101,7 @@ std::string PDBSymbolCompiland::getSourceFileFullPath() const {
               .Case(".cc", LangC)
               .Case(".cxx", LangC)
               .Case(".asm", Lang == PDB_Lang::Masm)
+              .Case(".rs", Lang == PDB_Lang::Masm)
               .Default(false))
         return File->getFileName();
     }
