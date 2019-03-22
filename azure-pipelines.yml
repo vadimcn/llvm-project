@@ -18,7 +18,7 @@ jobs:
       sudo apt-get install swig3.0 libedit-dev
       mkdir build
       cd build
-      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo\
+      cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
             -DLLVM_PARALLEL_LINK_JOBS=1\
             -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
@@ -77,7 +77,7 @@ jobs:
       brew install swig
       mkdir build
       cd build
-      cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo\
+      cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
             -DLLVM_PARALLEL_LINK_JOBS=1\
             -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
@@ -157,7 +157,7 @@ jobs:
       mkdir build
       cd build
       cmake -GNinja^
-            -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+            -DCMAKE_BUILD_TYPE=MinSizeRel^
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}^
             -DCMAKE_C_COMPILER=cl^
             -DCMAKE_CXX_COMPILER=cl^
