@@ -13,11 +13,14 @@ jobs:
       cat /proc/cpuinfo
       cat /proc/meminfo
     displayName: 'Info'
+
+  - script: |
+      sudo apt-get install -y swig3.0
+    displayName: 'Install'
     
   - script: |
-      sudo apt-get install swig3.0 libedit-dev
-      mkdir build
-      cd build
+      mkdir $(Agent.BuildDirectory)/build
+      cd $(Agent.BuildDirectory)/build
       cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
             -DLLVM_PARALLEL_LINK_JOBS=1\
@@ -31,13 +34,13 @@ jobs:
     displayName: 'Configure'
     
   - script: |
-      cmake --build build --target lldb -- -j4
-      cmake --build build --target lldb-server -- -j4
+      cmake --build $(Agent.BuildDirectory)/build --target lldb -- -j4
+      cmake --build $(Agent.BuildDirectory)/build --target lldb-server -- -j4
     displayName: 'Build'
 
   - script: |
-      cd build
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb-linux.zip\
+      cd $(Agent.BuildDirectory)/build
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-unknown-linux-gnu.zip\
         bin/lldb\
         bin/lldb-argdumper\
         bin/lldb-server\
@@ -50,13 +53,100 @@ jobs:
       artifactName: 'lldb'
  
   # - script: |
-  #     cmake --build build --target check-lldb
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
   #   displayName: 'test'
 
   - script: |
       env
-      cat build/CMakeCache.txt
-      find build -type d
+      cat $(Agent.BuildDirectory)/build/CMakeCache.txt
+      find $(Agent.BuildDirectory)/build -type d
+    displayName: 'On Failure'
+    condition: failed()
+
+############################################################
+
+- job: Linux_aarch64
+  pool:
+    vmImage: 'Ubuntu 16.04'
+
+  container: 'vadimcn/aarch64-unknown-linux-gnu:latest'
+
+  timeoutInMinutes: 360
+
+  steps:
+  - script: |
+      cat /proc/cpuinfo
+      cat /proc/meminfo
+    displayName: 'Info'
+
+  - script: |
+      sudo apt-get install -y swig3.0 g++
+    displayName: 'Install'
+
+  - script: |
+      mkdir $(Agent.BuildDirectory)/build-host
+      cd $(Agent.BuildDirectory)/build-host
+      cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
+            -DLLVM_ENABLE_PROJECTS="clang"\
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"\
+            $(Build.SourcesDirectory)/llvm
+    displayName: 'Configure:host'
+
+  - script: |
+      cmake --build $(Agent.BuildDirectory)/build-host --target llvm-tblgen -- -j4
+      cmake --build $(Agent.BuildDirectory)/build-host --target clang-tblgen -- -j4
+    displayName: 'Build:host'
+    
+  - script: |
+      mkdir $(Agent.BuildDirectory)/build
+      cd $(Agent.BuildDirectory)/build
+      cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
+            -DCMAKE_SYSTEM_NAME=Linux\
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64\
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc\
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++\
+            -DLLVM_TARGET_ARCH=aarch64\
+            -DLLVM_TABLEGEN=$(Agent.BuildDirectory)/build-host/bin/llvm-tblgen\
+            -DCLANG_TABLEGEN=$(Agent.BuildDirectory)/build-host/bin/clang-tblgen\
+            -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
+            -DLLVM_PARALLEL_LINK_JOBS=1\
+            -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
+            -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLDB_DISABLE_CURSES=TRUE\
+            -DLLDB_DISABLE_LIBEDIT=TRUE\
+            $(Build.SourcesDirectory)/llvm
+    displayName: 'Configure'
+    
+  - script: |
+      cmake --build $(Agent.BuildDirectory)/build --target lldb -- -j4
+      cmake --build $(Agent.BuildDirectory)/build --target lldb-server -- -j4
+    displayName: 'Build'
+
+  - script: |
+      cd $(Agent.BuildDirectory)/build
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--aarch64-unknown-linux-gnu.zip\
+        bin/lldb\
+        bin/lldb-argdumper\
+        bin/lldb-server\
+        lib/liblldb.*\
+        lib/python2.7/site-packages
+    displayName: 'Zip'
+
+  - task: PublishBuildArtifacts@1
+    inputs:
+      artifactName: 'lldb'
+ 
+  # - script: |
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
+  #   displayName: 'test'
+
+  - script: |
+      env
+      cat $(Agent.BuildDirectory)/build-host/CMakeCache.txt
+      cat $(Agent.BuildDirectory)/build/CMakeCache.txt
+      find $(Agent.BuildDirectory) -type d
     displayName: 'On Failure'
     condition: failed()
 
@@ -72,11 +162,14 @@ jobs:
   - script: |
       sysctl -a
     displayName: 'Info'
-    
+
   - script: |
       brew install swig
-      mkdir build
-      cd build
+    displayName: 'Install'
+    
+  - script: |
+      mkdir $(Agent.BuildDirectory)/build
+      cd $(Agent.BuildDirectory)/build
       cmake -DCMAKE_BUILD_TYPE=MinSizeRel\
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}\
             -DLLVM_PARALLEL_LINK_JOBS=1\
@@ -91,13 +184,13 @@ jobs:
     displayName: 'Configure'
     
   - script: |
-      cmake --build build --target lldb -- -j4
-      cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver build/bin/debugserver
+      cmake --build $(Agent.BuildDirectory)/build --target lldb -- -j4
+      cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/build/bin/debugserver
     displayName: 'Build'
 
   - script: |
-      cd build
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb-osx.zip\
+      cd $(Agent.BuildDirectory)/build
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-apple-darwin.zip\
         bin/lldb\
         bin/lldb.dSYM\
         bin/lldb-argdumper\
@@ -113,13 +206,13 @@ jobs:
       artifactName: 'lldb'
 
   # - script: |
-  #     cmake --build build --target check-lldb
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
   #   displayName: 'test'
 
   - script: |
       env
-      cat build/CMakeCache.txt
-      find build -type d
+      cat $(Agent.BuildDirectory)/build/CMakeCache.txt
+      find $(Agent.BuildDirectory)/build -type d
     displayName: 'On Failure'
     condition: failed()
 
@@ -142,7 +235,7 @@ jobs:
       curl -L http://prdownloads.sourceforge.net/swig/swigwin-3.0.12.zip -o %TEMP%/swig.zip
       unzip %TEMP%/swig.zip -d %AGENT_BUILDDIRECTORY%
       choco install ninja
-      choco install zip    
+      choco install zip
     displayName: 'Install'
 
   - task: BatchScript@1
@@ -154,8 +247,8 @@ jobs:
 
   - script: |
       PATH %AGENT_BUILDDIRECTORY%\swigwin-3.0.12;%PATH%
-      mkdir build
-      cd build
+      mkdir $(Agent.BuildDirectory)\build
+      cd $(Agent.BuildDirectory)\build
       cmake -GNinja^
             -DCMAKE_BUILD_TYPE=MinSizeRel^
             -DLLVM_VERSION_SUFFIX=${LLVM_VERSION_SUFFIX}^
@@ -177,12 +270,12 @@ jobs:
     displayName: 'Configure'
 
   - script: |
-      cmake --build build --target lldb -- -j4
+      cmake --build $(Agent.BuildDirectory)/build --target lldb -- -j4
     displayName: 'Build'
 
   - script: |
-      cd build
-      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb-windows.zip^
+      cd $(Agent.BuildDirectory)/build
+      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-pc-windows-msvc.zip^
         bin/lldb.*^
         bin/lldb-argdumper.*^
         bin/liblldb.*^
@@ -195,12 +288,12 @@ jobs:
       artifactName: 'lldb'
 
   # - script: |
-  #     cmake --build build --target check-lldb
+  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
   #   displayName: 'test'
 
   - script: |
       set
-      type build\CMakeCache.txt
-      tree build
+      type $(Agent.BuildDirectory)\build\CMakeCache.txt
+      tree $(Agent.BuildDirectory)\build
     displayName: 'On Failure'
     condition: failed()
