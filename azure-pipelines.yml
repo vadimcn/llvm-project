@@ -164,7 +164,15 @@ jobs:
     displayName: 'Info'
 
   - script: |
-      brew install swig
+      brew install pcre
+      mkdir -p $(Agent.BuildDirectory)/swig
+      curl -L https://sourceforge.net/projects/swig/files/swig/swig-3.0.12/swig-3.0.12.tar.gz -o $(Agent.BuildDirectory)/swig-3.0.12.tar.gz
+      cd $(Agent.BuildDirectory)
+      tar xf swig-3.0.12.tar.gz
+      cd $(Agent.BuildDirectory)/swig-3.0.12
+      ./configure --prefix $(Agent.BuildDirectory)/swig
+      make -j
+      make install
     displayName: 'Install'
     
   - script: |
@@ -180,6 +188,8 @@ jobs:
             -DLLDB_DISABLE_CURSES=TRUE\
             -DLLDB_DISABLE_LIBEDIT=TRUE\
             -DLLDB_USE_SYSTEM_DEBUGSERVER=TRUE\
+            -DSWIG_EXECUTABLE=$(Agent.BuildDirectory)/swig/bin/swig\
+            -DSWIG_DIR=$(Agent.BuildDirectory)/swig/share/swig/swig-3.0.12\
             $(Build.SourcesDirectory)/llvm
     displayName: 'Configure'
     
@@ -232,8 +242,7 @@ jobs:
       architecture: 'x64'
 
   - script: |
-      curl -L http://prdownloads.sourceforge.net/swig/swigwin-3.0.12.zip -o %TEMP%/swig.zip
-      unzip %TEMP%/swig.zip -d %AGENT_BUILDDIRECTORY%
+      choco install swig --version 3.0.12 
       choco install ninja
       choco install zip
     displayName: 'Install'
@@ -246,7 +255,6 @@ jobs:
     displayName: VsDevCmd    
 
   - script: |
-      PATH %AGENT_BUILDDIRECTORY%\swigwin-3.0.12;%PATH%
       mkdir $(Agent.BuildDirectory)\build
       cd $(Agent.BuildDirectory)\build
       cmake -GNinja^
