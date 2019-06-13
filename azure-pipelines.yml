@@ -26,11 +26,13 @@ jobs:
             -DLLVM_PARALLEL_LINK_JOBS=1\
             -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"\
-            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLVM_ENABLE_LIBXML2=FORCE_ON\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLDB_DISABLE_CURSES=TRUE\
             -DLLDB_DISABLE_LIBEDIT=TRUE\
             $(Build.SourcesDirectory)/llvm
+      cat CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
@@ -112,11 +114,13 @@ jobs:
             -DLLVM_PARALLEL_LINK_JOBS=1\
             -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"\
-            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLVM_ENABLE_LIBXML2=FORCE_ON\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLDB_DISABLE_CURSES=TRUE\
             -DLLDB_DISABLE_LIBEDIT=TRUE\
             $(Build.SourcesDirectory)/llvm
+      cat CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
@@ -183,14 +187,16 @@ jobs:
             -DLLVM_PARALLEL_LINK_JOBS=1\
             -DLLVM_ENABLE_PROJECTS="clang;libcxx;lldb"\
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"\
-            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLVM_ENABLE_TERMINFO=FALSE\
+            -DLLVM_ENABLE_LIBXML2=ON\
+            -DLLDB_RELOCATABLE_PYTHON=TRUE\
             -DLLDB_DISABLE_CURSES=TRUE\
             -DLLDB_DISABLE_LIBEDIT=TRUE\
             -DLLDB_USE_SYSTEM_DEBUGSERVER=TRUE\
             -DSWIG_EXECUTABLE=$(Agent.BuildDirectory)/swig/bin/swig\
             -DSWIG_DIR=$(Agent.BuildDirectory)/swig/share/swig/swig-3.0.12\
             $(Build.SourcesDirectory)/llvm
+      cat CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
@@ -241,18 +247,63 @@ jobs:
       addToPath: true
       architecture: 'x64'
 
+  - task: BatchScript@1
+    inputs:
+      filename: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\VsDevCmd.bat"
+      arguments: -arch=amd64 -host_arch=amd64
+      modifyEnvironment: true
+    displayName: VsDevCmd
+
   - script: |
       choco install swig --version 3.0.12 
       choco install ninja
       choco install zip
     displayName: 'Install'
 
-  - task: BatchScript@1
-    inputs:
-      filename: "C:\\Program Files (x86)\\Microsoft Visual Studio\\2017\\Enterprise\\Common7\\Tools\\VsDevCmd.bat"
-      arguments: -arch=amd64 -host_arch=amd64
-      modifyEnvironment: true
-    displayName: VsDevCmd    
+  - script: |
+      git clone https://github.com/robotology-dependencies/libxml2-cmake-buildsystem.git $(Build.SourcesDirectory)/libxml2
+      mkdir $(Agent.BuildDirectory)\build_xml2
+      cd $(Agent.BuildDirectory)\build_xml2
+      cmake -GNinja^
+            -DCMAKE_BUILD_TYPE=MinSizeRel^
+            -DCMAKE_C_COMPILER=cl^
+            -DCMAKE_CXX_COMPILER=cl^
+            -DCMAKE_INSTALL_PREFIX=$(Agent.BuildDirectory)\libxml2^
+            -DBUILD_SHARED_LIBS=OFF^
+            -DLIBXML2_WITH_SAX1=ON^
+            -DLIBXML2_WITH_THREADS=ON^
+            -DLIBXML2_WITH_FEXCEPTIONS=OFF^
+            -DLIBXML2_WITH_FTP=OFF^
+            -DLIBXML2_WITH_HISTORY=OFF^
+            -DLIBXML2_WITH_HTML=OFF^
+            -DLIBXML2_WITH_HTTP=OFF^
+            -DLIBXML2_WITH_ICONV=OFF^
+            -DLIBXML2_WITH_ICU=OFF^
+            -DLIBXML2_WITH_ISO8859X=OFF^
+            -DLIBXML2_WITH_LEGACY=OFF^
+            -DLIBXML2_WITH_MEM_DEBUG=OFF^
+            -DLIBXML2_WITH_MINIMUM=OFF^
+            -DLIBXML2_WITH_OUTPUT=OFF^
+            -DLIBXML2_WITH_PATTERN=OFF^
+            -DLIBXML2_WITH_PUSH=OFF^
+            -DLIBXML2_WITH_READER=OFF^
+            -DLIBXML2_WITH_REGEXPS=OFF^
+            -DLIBXML2_WITH_RUN_DEBUG=OFF^
+            -DLIBXML2_WITH_SCHEMAS=OFF^
+            -DLIBXML2_WITH_SCHEMATRON=OFF^
+            -DLIBXML2_WITH_THREAD_ALLOC=OFF^
+            -DLIBXML2_WITH_TREE=OFF^
+            -DLIBXML2_WITH_VALID=OFF^
+            -DLIBXML2_WITH_WRITER=OFF^
+            -DLIBXML2_WITH_XINCLUDE=OFF^
+            -DLIBXML2_WITH_XPATH=OFF^
+            -DLIBXML2_WITH_XPTR=OFF^
+            -DLIBXML2_WITH_MODULES=OFF^
+            -DLIBXML2_WITH_ZLIB=OFF^
+            -DLIBXML2_WITH_LZMA=OFF^
+            $(Build.SourcesDirectory)/libxml2
+      cmake --build . --target install
+    displayName: 'Build LibXML2'
 
   - script: |
       mkdir $(Agent.BuildDirectory)\build
@@ -267,14 +318,20 @@ jobs:
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64;ARM"^
             -DLLVM_ENABLE_DIA_SDK=TRUE^
             -DPYTHON_HOME=%USEPYTHONVERSION_PYTHONLOCATION%^
-            -DLLDB_RELOCATABLE_PYTHON=TRUE^
             -DLLVM_ENABLE_TERMINFO=FALSE^
+            -DLLDB_RELOCATABLE_PYTHON=TRUE^
             -DLLDB_DISABLE_CURSES=TRUE^
             -DLLDB_DISABLE_LIBEDIT=TRUE^
             -DPYTHON_DEBUG_EXE=%USEPYTHONVERSION_PYTHONLOCATION%\python.exe^
             -DPYTHON_DEBUG_DLL=%USEPYTHONVERSION_PYTHONLOCATION%\python36.dll^
             -DPYTHON_DEBUG_LIB=%USEPYTHONVERSION_PYTHONLOCATION%\libs\python36.lib^
+            -DLLVM_ENABLE_LIBXML2=ON^
+            -DLIBXML2_FOUND=1^
+            -DLIBXML2_VERSION_STRING=2.9.3^
+            -DLIBXML2_INCLUDE_DIR=$(Agent.BuildDirectory)\libxml2\include\libxml2^
+            -DLIBXML2_LIBRARIES=$(Agent.BuildDirectory)\libxml2\lib\xml2.lib^
             $(Build.SourcesDirectory)/llvm
+      type CMakeCache.txt
     displayName: 'Configure'
 
   - script: |
