@@ -1278,6 +1278,15 @@ RustASTContext::GetArrayElementType(lldb::opaque_compiler_type_t type,
   return CompilerType();
 }
 
+CompilerType 
+RustASTContext::GetArrayType(lldb::opaque_compiler_type_t type,
+                             uint64_t size) {
+  if (type) {
+    return CreateArrayType(CompilerType(this, type), size);
+  }
+  return CompilerType();
+}
+
 CompilerType RustASTContext::GetCanonicalType(lldb::opaque_compiler_type_t type) {
   RustTypedef *t = static_cast<RustType *>(type)->AsTypedef();
   if (t)
