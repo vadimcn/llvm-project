@@ -68,33 +68,32 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
   STARTUPINFO startupinfo = {};
   PROCESS_INFORMATION pi = {};
 
-  HANDLE stdin_handle = GetStdioHandle(launch_info, STDIN_FILENO);
-  HANDLE stdout_handle = GetStdioHandle(launch_info, STDOUT_FILENO);
-  HANDLE stderr_handle = GetStdioHandle(launch_info, STDERR_FILENO);
-
+  bool close_stdin = false;
+  bool close_stdout = false;
+  bool close_stderr = false;
+  
   startupinfo.cb = sizeof(startupinfo);
-  startupinfo.dwFlags |= STARTF_USESTDHANDLES;
-  startupinfo.hStdError =
-      stderr_handle ? stderr_handle : ::GetStdHandle(STD_ERROR_HANDLE);
-  startupinfo.hStdInput =
-      stdin_handle ? stdin_handle : ::GetStdHandle(STD_INPUT_HANDLE);
-  startupinfo.hStdOutput =
-      stdout_handle ? stdout_handle : ::GetStdHandle(STD_OUTPUT_HANDLE);
 
-  const char *hide_console_var =
-      getenv("LLDB_LAUNCH_INFERIORS_WITHOUT_CONSOLE");
-  if (hide_console_var &&
-      llvm::StringRef(hide_console_var).equals_insensitive("true")) {
-    startupinfo.dwFlags |= STARTF_USESHOWWINDOW;
-    startupinfo.wShowWindow = SW_HIDE;
-  }
+  Flags launch_flags = launch_info.GetFlags();
+  DWORD flags = CREATE_UNICODE_ENVIRONMENT;
 
-  DWORD flags = CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT;
-  if (launch_info.GetFlags().Test(eLaunchFlagDebug))
+  if (launch_flags.Test(eLaunchFlagDebug))
     flags |= DEBUG_ONLY_THIS_PROCESS;
 
-  if (launch_info.GetFlags().Test(eLaunchFlagDisableSTDIO))
-    flags &= ~CREATE_NEW_CONSOLE;
+  if (launch_flags.Test(eLaunchFlagDisableSTDIO)) {
+    flags |= DETACHED_PROCESS;
+  } else {
+    startupinfo.dwFlags |= STARTF_USESTDHANDLES;
+    startupinfo.hStdInput = GetStdioHandle(launch_info, STDIN_FILENO, close_stdin);
+    startupinfo.hStdOutput = GetStdioHandle(launch_info, STDOUT_FILENO, close_stdout);
+    startupinfo.hStdError = GetStdioHandle(launch_info, STDERR_FILENO, close_stderr);
+
+    if (launch_flags.Test(eLaunchFlagLaunchInTTY))
+      flags |= CREATE_NEW_CONSOLE;
+  }
+
+  if (launch_flags.Test(eLaunchFlagLaunchInSeparateProcessGroup))
+    flags |= CREATE_NEW_PROCESS_GROUP;
 
   LPVOID env_block = nullptr;
   ::CreateEnvironmentBuffer(launch_info.GetEnvironment(), environment);
@@ -131,12 +130,12 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
     ::CloseHandle(pi.hThread);
   }
 
-  if (stdin_handle)
-    ::CloseHandle(stdin_handle);
-  if (stdout_handle)
-    ::CloseHandle(stdout_handle);
-  if (stderr_handle)
-    ::CloseHandle(stderr_handle);
+  if (close_stdin)
+    ::CloseHandle(startupinfo.hStdInput);
+  if (close_stdout)
+    ::CloseHandle(startupinfo.hStdOutput);
+  if (close_stderr)
+    ::CloseHandle(startupinfo.hStdError);
 
   if (!result)
     return HostProcess();
@@ -146,34 +145,55 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
 
 HANDLE
 ProcessLauncherWindows::GetStdioHandle(const ProcessLaunchInfo &launch_info,
-                                       int fd) {
-  const FileAction *action = launch_info.GetFileActionForFD(fd);
-  if (action == nullptr)
-    return NULL;
-  SECURITY_ATTRIBUTES secattr = {};
-  secattr.nLength = sizeof(SECURITY_ATTRIBUTES);
-  secattr.bInheritHandle = TRUE;
+                                       int fd, bool &owned) {
+  for (size_t i = 0; i < launch_info.GetNumFileActions(); ++i) {
+    const FileAction *action = launch_info.GetFileActionAtIndex(i);
 
-  llvm::StringRef path = action->GetPath();
-  DWORD access = 0;
-  DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
-  DWORD create = 0;
-  DWORD flags = 0;
-  if (fd == STDIN_FILENO) {
-    access = GENERIC_READ;
-    create = OPEN_EXISTING;
-    flags = FILE_ATTRIBUTE_READONLY;
-  }
-  if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
-    access = GENERIC_WRITE;
-    create = CREATE_ALWAYS;
-    if (fd == STDERR_FILENO)
-      flags = FILE_FLAG_WRITE_THROUGH;
+    if (action->GetAction() == FileAction::eFileActionClose && action->GetFD() == fd) {
+      owned = false;
+      return INVALID_HANDLE_VALUE;
+
+    } else if (action->GetAction() == FileAction::eFileActionDuplicate && action->GetActionArgument() == fd) {
+      owned = false;
+      return (HANDLE)_get_osfhandle(action->GetFD());
+      
+    } else if (action->GetAction() == FileAction::eFileActionOpen && action->GetFD() == fd) {
+      SECURITY_ATTRIBUTES secattr = {};
+      secattr.nLength = sizeof(SECURITY_ATTRIBUTES);
+      secattr.bInheritHandle = TRUE;
+
+      llvm::StringRef path = action->GetPath();
+      DWORD access = 0;
+      DWORD share = FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE;
+      DWORD create = 0;
+      DWORD flags = 0;
+      if (fd == STDIN_FILENO) {
+        access = GENERIC_READ;
+        create = OPEN_EXISTING;
+        flags = FILE_ATTRIBUTE_READONLY;
+      }
+      if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
+        access = GENERIC_WRITE;
+        create = CREATE_ALWAYS;
+        if (fd == STDERR_FILENO)
+          flags = FILE_FLAG_WRITE_THROUGH;
+      }
+
+      std::wstring wpath;
+      llvm::ConvertUTF8toWide(path, wpath);
+      HANDLE result = ::CreateFileW(wpath.c_str(), access, share, &secattr, create,
+                                    flags, NULL);
+      owned = true;
+      return result;
+    }
   }
 
-  std::wstring wpath;
-  llvm::ConvertUTF8toWide(path, wpath);
-  HANDLE result = ::CreateFileW(wpath.c_str(), access, share, &secattr, create,
-                                flags, NULL);
-  return (result == INVALID_HANDLE_VALUE) ? NULL : result;
+  owned = false;
+  if (fd == STDIN_FILENO)
+    return ::GetStdHandle(STD_INPUT_HANDLE);
+  if (fd == STDOUT_FILENO)
+    return ::GetStdHandle(STD_OUTPUT_HANDLE);
+  if (fd == STDERR_FILENO)
+    return ::GetStdHandle(STD_ERROR_HANDLE);
+  return INVALID_HANDLE_VALUE;
 }
