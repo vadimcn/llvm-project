@@ -236,6 +236,9 @@ public:
   CompilerType GetArrayElementType(lldb::opaque_compiler_type_t type,
                                    uint64_t *stride = nullptr) override;
 
+  CompilerType GetArrayType(lldb::opaque_compiler_type_t type,
+                            uint64_t size) override;
+
   CompilerType GetCanonicalType(lldb::opaque_compiler_type_t type) override;
 
   // Returns -1 if this isn't a function of if the function doesn't have a
