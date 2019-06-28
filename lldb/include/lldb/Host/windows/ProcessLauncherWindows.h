@@ -22,7 +22,7 @@ public:
                             Status &error) override;
 
 protected:
-  HANDLE GetStdioHandle(const ProcessLaunchInfo &launch_info, int fd);
+  HANDLE GetStdioHandle(const ProcessLaunchInfo &launch_info, int fd, bool &owned);
 };
 }
 
