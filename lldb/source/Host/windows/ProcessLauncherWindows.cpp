@@ -141,13 +141,17 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
     startupinfo.wShowWindow = SW_HIDE;
   }
 
-  DWORD flags = CREATE_NEW_CONSOLE | CREATE_UNICODE_ENVIRONMENT |
-                EXTENDED_STARTUPINFO_PRESENT;
+  DWORD flags = CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT;
   if (launch_info.GetFlags().Test(eLaunchFlagDebug))
     flags |= DEBUG_ONLY_THIS_PROCESS;
 
   if (launch_info.GetFlags().Test(eLaunchFlagDisableSTDIO))
-    flags &= ~CREATE_NEW_CONSOLE;
+    flags |= DETACHED_PROCESS;
+  else if (launch_info.GetFlags().Test(eLaunchFlagLaunchInTTY))
+    flags |= CREATE_NEW_CONSOLE;
+
+  if (launch_info.GetFlags().Test(eLaunchFlagLaunchInSeparateProcessGroup))
+    flags |= CREATE_NEW_PROCESS_GROUP;
 
   LPVOID env_block = nullptr;
   ::CreateEnvironmentBuffer(launch_info.GetEnvironment(), environment);
