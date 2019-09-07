@@ -7,6 +7,10 @@ if (LLDB_ENABLE_LIBEDIT)
   list(APPEND LLDB_LIBEDIT_LIBS ${LibEdit_LIBRARIES})
 endif()
 
+if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
+  set(PYTHON_LIBRARY "") # Don't actually link to libpython, except on Windows.
+endif()
+
 add_lldb_library(lldbPluginScriptInterpreterPython PLUGIN
   PythonDataObjects.cpp
   PythonReadline.cpp
