@@ -38,6 +38,43 @@
 #include <locale>
 #endif
 
+#pragma weak Py_InitializeEx
+// Data
+#pragma weak PyExc_KeyboardInterrupt
+#pragma weak PyExc_SystemExit
+#pragma weak PyExc_NotImplementedError
+#pragma weak PyExc_IOError
+#pragma weak PyExc_IndexError
+#pragma weak PyExc_TypeError
+#pragma weak PyExc_ZeroDivisionError
+#pragma weak PyExc_OverflowError
+#pragma weak PyExc_SyntaxError
+#pragma weak PyExc_ValueError
+#pragma weak PyExc_SystemError
+#pragma weak PyExc_AttributeError
+#pragma weak PyExc_MemoryError
+#pragma weak PyExc_RuntimeError
+#pragma weak PyFile_Type
+#pragma weak PyMethod_Type
+#pragma weak PyModule_Type
+#pragma weak PyByteArray_Type
+#pragma weak PyFunction_Type
+#pragma weak PyCFunction_Type
+#pragma weak PyInstance_Type
+#pragma weak PyBool_Type
+#pragma weak PyType_IsSubtype
+#pragma weak PyFloat_Type
+#pragma weak PyClass_Type
+#pragma weak PyType_Ready
+#pragma weak _PyThreadState_Current
+#pragma weak _PyWeakref_CallableProxyType
+#pragma weak _PyWeakref_ProxyType
+#pragma weak _Py_TrueStruct
+#pragma weak _Py_ZeroStruct
+#pragma weak _Py_NotImplementedStruct
+#pragma weak _Py_NoneStruct
+#pragma weak PyObject_GenericGetAttr
+
 // Include python for non windows machines
 #include <Python.h>
 #endif
