@@ -160,6 +160,10 @@ else()
     PROPERTIES
     OUTPUT_NAME lldb
   )
+  string(REPLACE "-Wl,-z,defs" "" CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS}")
+  if (CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup")
+  endif()
 endif()
 
 if (NOT LLDB_BUILT_STANDALONE)

@@ -188,6 +188,7 @@ extern "C" void *
 LLDBSWIGPython_GetDynamicSetting(void *module, const char *setting,
                                  const lldb::TargetSP &target_sp);
 
+static LazyBool g_enabled = eLazyBoolCalculate;
 static bool g_initialized = false;
 
 namespace {
@@ -403,6 +404,7 @@ ScriptInterpreterPythonImpl::Locker::Locker(
     : ScriptInterpreterLocker(),
       m_teardown_session((on_leave & TearDownSession) == TearDownSession),
       m_python_interpreter(py_interpreter) {
+  lldbassert(g_initialized && "ScriptInterpreterPython not initialized!");
   DoAcquireLock();
   if ((on_entry & InitSession) == InitSession) {
     if (!DoInitSession(on_entry, in, out, err)) {
@@ -3200,6 +3202,16 @@ ScriptInterpreterPythonImpl::AcquireInterpreterLock() {
       this, Locker::AcquireLock | Locker::InitSession | Locker::NoSTDIN,
       Locker::FreeLock | Locker::TearDownSession));
   return py_lock;
+}
+
+bool ScriptInterpreterPython::IsEnabled() {
+  if (g_enabled == eLazyBoolCalculate) {
+    if (Py_InitializeEx && !getenv("LLDB_DISABLE_PYTHON"))
+      g_enabled = eLazyBoolYes;
+    else
+      g_enabled = eLazyBoolNo;
+  }
+  return g_enabled == eLazyBoolYes;
 }
 
 void ScriptInterpreterPythonImpl::InitializePrivate() {

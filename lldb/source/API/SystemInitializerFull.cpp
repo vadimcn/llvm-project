@@ -146,11 +146,10 @@ llvm::Error SystemInitializerFull::Initialize() {
   ScriptInterpreterNone::Initialize();
 
 #ifndef LLDB_DISABLE_PYTHON
-  OperatingSystemPython::Initialize();
-#endif
-
-#if !defined(LLDB_DISABLE_PYTHON)
-  ScriptInterpreterPython::Initialize();
+  if (ScriptInterpreterPython::IsEnabled()) {
+    OperatingSystemPython::Initialize();
+    ScriptInterpreterPython::Initialize();
+  }
 #endif
 
   platform_freebsd::PlatformFreeBSD::Initialize();

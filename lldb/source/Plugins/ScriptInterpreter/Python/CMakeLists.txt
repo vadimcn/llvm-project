@@ -9,6 +9,7 @@ if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
   if (get_libdir_status EQUAL 0)
     add_definitions(-DLLDB_PYTHON_RELATIVE_LIBDIR="${relative_libdir}")
   endif()
+  set(PYTHON_LIBRARY "") # Don't actually link to the python lib, except on Windows.
 endif()
 
 add_lldb_library(lldbPluginScriptInterpreterPython PLUGIN
