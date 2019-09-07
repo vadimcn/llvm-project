@@ -184,11 +184,10 @@ llvm::Error SystemInitializerFull::Initialize() {
   ScriptInterpreterNone::Initialize();
 
 #if LLDB_ENABLE_PYTHON
-  OperatingSystemPython::Initialize();
-#endif
-
-#if LLDB_ENABLE_PYTHON
-  ScriptInterpreterPython::Initialize();
+  if (ScriptInterpreterPython::IsEnabled()) {
+    OperatingSystemPython::Initialize();
+    ScriptInterpreterPython::Initialize();
+  }
 #endif
 
 #if LLDB_ENABLE_LUA
