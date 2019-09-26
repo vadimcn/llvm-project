@@ -127,7 +127,8 @@ bool ValueObjectChild::UpdateValue() {
            (parent_type_flags.AnySet(lldb::eTypeInstanceIsPointer)));
 
       if (parent->GetCompilerType().ShouldTreatScalarValueAsAddress()) {
-        lldb::addr_t addr = parent->GetPointerValue();
+        AddressType addr_type;
+        lldb::addr_t addr = parent->GetPointerValue(&addr_type);
         m_value.GetScalar() = addr;
 
         if (addr == LLDB_INVALID_ADDRESS) {
@@ -136,7 +137,6 @@ bool ValueObjectChild::UpdateValue() {
           m_error.SetErrorString("parent is NULL");
         } else {
           m_value.GetScalar() += m_byte_offset;
-          AddressType addr_type = parent->GetAddressTypeOfChildren();
 
           switch (addr_type) {
           case eAddressTypeFile: {
