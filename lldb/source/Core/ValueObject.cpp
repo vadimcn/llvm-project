@@ -1558,7 +1558,7 @@ addr_t ValueObject::GetPointerValue(AddressType *address_type) {
   }
 
   if (address_type)
-    *address_type = GetAddressTypeOfChildren();
+    *address_type = eAddressTypeLoad;
 
   return address;
 }
