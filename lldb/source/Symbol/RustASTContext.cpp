@@ -1948,7 +1948,7 @@ RustASTContext::CreateFunctionType(const lldb_private::ConstString &name,
                                    const std::vector<CompilerType> &&params,
                                    const std::vector<CompilerType> &&template_params) {
   RustType *type = new RustFunction(name, m_pointer_byte_size, return_type, std::move(params),
-				    std::move(template_params));
+                                    std::move(template_params));
   return CacheType(type);
 }
 
@@ -2189,7 +2189,7 @@ bool RustASTContext::GetCABITypeDeclaration(CompilerType type, const std::string
 }
 
 CompilerType RustASTContext::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
-						     size_t idx) {
+                                                     size_t idx) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {
