@@ -20,9 +20,9 @@ using namespace lldb_private;
 using namespace lldb;
 
 bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
-			       ExecutionContext &exe_ctx,
-			       lldb_private::ExecutionPolicy execution_policy,
-			       bool keep_result_in_memory, bool generate_debug_info)
+                               ExecutionContext &exe_ctx,
+                               lldb_private::ExecutionPolicy execution_policy,
+                               bool keep_result_in_memory, bool generate_debug_info)
 {
   InstallContext(exe_ctx);
 
@@ -38,10 +38,10 @@ bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
 }
 
 lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
-						      ExecutionContext &exe_ctx,
-						      const EvaluateExpressionOptions &options,
-						      lldb::UserExpressionSP &shared_ptr_to_me,
-						      lldb::ExpressionVariableSP &result)
+                                                      ExecutionContext &exe_ctx,
+                                                      const EvaluateExpressionOptions &options,
+                                                      lldb::UserExpressionSP &shared_ptr_to_me,
+                                                      lldb::ExpressionVariableSP &result)
 {
   Status error;
   ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
@@ -60,7 +60,7 @@ lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnos
       target->GetPersistentExpressionStateForLanguage(eLanguageTypeRust);
   if (pv != nullptr) {
     result->SetName(pv->GetNextPersistentVariableName(*target,
-						      pv->GetPersistentVariablePrefix()));
+                                                      pv->GetPersistentVariablePrefix()));
     pv->AddVariable(result);
   }
 
