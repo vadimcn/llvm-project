@@ -255,12 +255,7 @@ public:
     m_py_obj = nullptr;
   }
 
-  void Dump() const {
-    if (m_py_obj)
-      _PyObject_Dump(m_py_obj);
-    else
-      puts("NULL");
-  }
+  void Dump() const;
 
   void Dump(Stream &strm) const;
 
@@ -615,6 +610,7 @@ class PythonCallable : public TypedPythonObject<PythonCallable> {
 public:
   using TypedPythonObject::TypedPythonObject;
 
+#ifndef Py_LIMITED_API
   struct ArgInfo {
     /* the largest number of positional arguments this callable
      * can accept, or UNBOUNDED, ie UINT_MAX if it's a varargs
@@ -622,11 +618,13 @@ public:
     unsigned max_positional_args;
     static constexpr unsigned UNBOUNDED = UINT_MAX; // FIXME c++17 inline
   };
+#endif
 
   static bool Check(PyObject *py_obj);
 
+#ifndef Py_LIMITED_API  
   llvm::Expected<ArgInfo> GetArgInfo() const;
-
+#endif
   PythonObject operator()();
 
   PythonObject operator()(std::initializer_list<PyObject *> args);

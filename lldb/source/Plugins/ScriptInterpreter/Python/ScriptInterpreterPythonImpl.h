@@ -21,6 +21,10 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 
+#ifdef Py_LIMITED_API
+int PyRun_SimpleString(const char* str);
+#endif
+
 namespace lldb_private {
 class IOHandlerPythonInterpreter;
 class ScriptInterpreterPythonImpl : public ScriptInterpreterPython {
