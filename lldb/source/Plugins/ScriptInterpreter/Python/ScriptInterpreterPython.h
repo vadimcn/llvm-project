@@ -46,6 +46,7 @@ public:
       : ScriptInterpreter(debugger, lldb::eScriptLanguagePython),
         IOHandlerDelegateMultiline("DONE") {}
 
+  static bool IsEnabled();
   static void Initialize();
   static void Terminate();
   static lldb_private::ConstString GetPluginNameStatic();

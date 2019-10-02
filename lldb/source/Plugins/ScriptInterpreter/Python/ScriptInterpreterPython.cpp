@@ -208,6 +208,7 @@ extern "C" void *
 LLDBSWIGPython_GetDynamicSetting(void *module, const char *setting,
                                  const lldb::TargetSP &target_sp);
 
+static LazyBool g_enabled = eLazyBoolCalculate;
 static bool g_initialized = false;
 
 namespace {
@@ -304,7 +305,7 @@ private:
 // would always return `true` and `PyGILState_Ensure/Release` flow would be
 // executed instead of unlocking GIL with `PyEval_SaveThread`. When
 // an another thread calls `PyGILState_Ensure` it would get stuck in deadlock.
-#if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 7) || (PY_MAJOR_VERSION > 3)
+#if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 7) || (PY_MAJOR_VERSION > 3) || Py_LIMITED_API
     // The only case we should go further and acquire the GIL: it is unlocked.
     if (PyGILState_Check())
       return;
@@ -408,6 +409,7 @@ ScriptInterpreterPythonImpl::Locker::Locker(
     : ScriptInterpreterLocker(),
       m_teardown_session((on_leave & TearDownSession) == TearDownSession),
       m_python_interpreter(py_interpreter) {
+  lldbassert(g_initialized && "ScriptInterpreterPython not initialized!");
   DoAcquireLock();
   if ((on_entry & InitSession) == InitSession) {
     if (!DoInitSession(on_entry, in, out, err)) {
@@ -1076,7 +1078,10 @@ bool ScriptInterpreterPythonImpl::Interrupt() {
     if (!state)
       state = GetThreadState();
     if (state) {
-      long tid = state->thread_id;
+      long tid = 0;
+#ifndef Py_LIMITED_API
+      tid = state->thread_id;
+#endif
       PyThreadState_Swap(state);
       int num_threads = PyThreadState_SetAsyncExc(tid, PyExc_KeyboardInterrupt);
       LLDB_LOGF(log,
@@ -3214,6 +3219,16 @@ ScriptInterpreterPythonImpl::AcquireInterpreterLock() {
       this, Locker::AcquireLock | Locker::InitSession | Locker::NoSTDIN,
       Locker::FreeLock | Locker::TearDownSession));
   return py_lock;
+}
+
+bool ScriptInterpreterPython::IsEnabled() {
+  if (g_enabled == eLazyBoolCalculate) {
+    if (Py_InitializeEx && !getenv("LLDB_DISABLE_PYTHON"))
+      g_enabled = eLazyBoolYes;
+    else
+      g_enabled = eLazyBoolNo;
+  }
+  return g_enabled == eLazyBoolYes;
 }
 
 void ScriptInterpreterPythonImpl::InitializePrivate() {

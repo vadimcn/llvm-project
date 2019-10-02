@@ -141,7 +141,7 @@ LLDBSwigPythonCallTypeScript
 
     PyObject *pfunc_impl = nullptr;
 
-    if (pyfunct_wrapper && *pyfunct_wrapper && PyFunction_Check (*pyfunct_wrapper))
+    if (pyfunct_wrapper && *pyfunct_wrapper /*&& PyFunction_Check (*pyfunct_wrapper)*/)
     {
         pfunc_impl = (PyObject*)(*pyfunct_wrapper);
         if (pfunc_impl->ob_refcnt == 1)
