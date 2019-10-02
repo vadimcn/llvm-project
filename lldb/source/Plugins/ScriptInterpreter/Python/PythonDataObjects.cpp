@@ -13,6 +13,7 @@
 #include "PythonDataObjects.h"
 #include "ScriptInterpreterPython.h"
 
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Host/File.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Interpreter/ScriptInterpreter.h"
@@ -69,6 +70,7 @@ void StructuredPythonObject::Serialize(llvm::json::OStream &s) const {
 
 void PythonObject::Dump(Stream &strm) const {
   if (m_py_obj) {
+#ifndef Py_LIMITED_API
     FILE *file = llvm::sys::RetryAfterSignal(nullptr, ::tmpfile);
     if (file) {
       ::PyObject_Print(m_py_obj, file, 0);
@@ -83,8 +85,16 @@ void PythonObject::Dump(Stream &strm) const {
       }
       ::fclose(file);
     }
+#else
+    strm << this->Repr().GetString();
+#endif
   } else
     strm.PutCString("NULL");
+}
+
+void PythonObject::Dump() const {
+  StreamFile errstrm(2, false);
+  errstrm << "object : " << this->Repr().GetString();
 }
 
 PyObjectType PythonObject::GetObjectType() const {
@@ -372,11 +382,16 @@ Expected<llvm::StringRef> PythonString::AsUTF8() const {
   if (!IsValid())
     return nullDeref();
 
-  Py_ssize_t size;
-  const char *data;
+  Py_ssize_t size = 0;
+  const char *data = nullptr;
 
 #if PY_MAJOR_VERSION >= 3
+# ifndef Py_LIMITED_API
   data = PyUnicode_AsUTF8AndSize(m_py_obj, &size);
+# else
+  // Py_LIMITED_API doesn't provide PyUnicode_AsUTF8AndSize(), but this loophole seems to work.
+  PyArg_Parse(m_py_obj, "s#", &data, &size);
+# endif 
 #else
   char *c = NULL;
   int r = PyString_AsStringAndSize(m_py_obj, &c, &size);
@@ -535,7 +550,7 @@ bool PythonList::Check(PyObject *py_obj) {
 
 uint32_t PythonList::GetSize() const {
   if (IsValid())
-    return PyList_GET_SIZE(m_py_obj);
+    return PyList_Size(m_py_obj);
   return 0;
 }
 
@@ -614,7 +629,7 @@ bool PythonTuple::Check(PyObject *py_obj) {
 
 uint32_t PythonTuple::GetSize() const {
   if (IsValid())
-    return PyTuple_GET_SIZE(m_py_obj);
+    return PyTuple_Size(m_py_obj);
   return 0;
 }
 
@@ -964,7 +979,7 @@ protected:
 const char *PythonException::toCString() const {
   if (!m_repr_bytes)
     return "unknown exception";
-  return PyBytes_AS_STRING(m_repr_bytes);
+  return PyBytes_AsString(m_repr_bytes);
 }
 
 PythonException::PythonException(const char *caller) {
@@ -1157,6 +1172,7 @@ char SimplePythonFile::ID = 0;
 
 #if PY_MAJOR_VERSION >= 3
 
+#ifndef Py_LIMITED_API
 namespace {
 class PythonBuffer {
 public:
@@ -1190,6 +1206,7 @@ private:
   Py_buffer m_buffer;
 };
 } // namespace
+#endif
 
 // Shared methods between TextPythonFile and BinaryPythonFile
 namespace {
@@ -1250,6 +1267,7 @@ public:
 
   Status Write(const void *buf, size_t &num_bytes) override {
     GIL takeGIL;
+
     PyObject *pybuffer_p = PyMemoryView_FromMemory(
         const_cast<char *>((const char *)buf), num_bytes, PyBUF_READ);
     if (!pybuffer_p)
@@ -1279,11 +1297,18 @@ public:
       num_bytes = 0;
       return Status();
     }
+#ifndef Py_LIMITED_API
     auto pybuffer = PythonBuffer::Create(pybuffer_obj.get());
     if (!pybuffer)
       return Status(pybuffer.takeError());
     memcpy(buf, pybuffer.get().get().buf, pybuffer.get().get().len);
     num_bytes = pybuffer.get().get().len;
+#else
+  const char* data;
+  if (!PyArg_Parse(pybuffer_obj.get().get(), "y#", &data, &num_bytes))
+    return Status(llvm::make_error<PythonException>());
+  memcpy(buf, data, num_bytes);
+#endif
     return Status();
   }
 };
@@ -1567,4 +1592,37 @@ python::runStringMultiLine(const llvm::Twine &string,
   return Take<PythonObject>(result);
 }
 
+#endif
+
+#ifdef Py_LIMITED_API
+PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals)
+{
+  PyObject* code = Py_CompileString(str, "<string>", start);
+  if (!code)
+    return nullptr;
+  PyObject* result = PyEval_EvalCode(code, globals, locals);
+  Py_DECREF(code);
+  return result;
+}
+
+int PyRun_SimpleString(const char* str)
+{
+  PyObject *m, *d, *v;
+  m = PyImport_AddModule("__main__");
+  if (m == NULL)
+      return -1;
+  d = PyModule_GetDict(m);
+  v = PyRun_String(str, Py_file_input, d, d);
+  if (v == NULL) {
+      PyErr_Print();
+      return -1;
+  }
+  Py_DECREF(v);
+  return 0;
+}
+
+int PyGILState_Check() {
+  PyThreadState* tstate = PyThreadState_Get();
+  return tstate && tstate == PyGILState_GetThisThreadState();
+}
 #endif

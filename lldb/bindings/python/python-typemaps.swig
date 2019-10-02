@@ -494,16 +494,13 @@ bool SetNumberFromPyObject<double>(double &number, PyObject *obj) {
 
 %define %pybuffer_mutable_binary(TYPEMAP, SIZE)
 %typemap(in) (TYPEMAP, SIZE) {
-  int res; Py_ssize_t size = 0; void *buf = 0;
-  Py_buffer view;
-  res = PyObject_GetBuffer($input, &view, PyBUF_WRITABLE);
-  if (res < 0) {
+  int res;
+  const char *buf;
+  int size;
+  if (!PyArg_Parse($input, "y#", &buf, &size)) {
     PyErr_Clear();
     %argument_fail(res, "(TYPEMAP, SIZE)", $symname, $argnum);
   }
-  size = view.len;
-  buf = view.buf;
-  PyBuffer_Release(&view);
   $1 = ($1_ltype) buf;
   $2 = ($2_ltype) (size/sizeof($*1_type));
 }
@@ -511,16 +508,13 @@ bool SetNumberFromPyObject<double>(double &number, PyObject *obj) {
 
 %define %pybuffer_binary(TYPEMAP, SIZE)
 %typemap(in) (TYPEMAP, SIZE) {
-  int res; Py_ssize_t size = 0; const void *buf = 0;
-  Py_buffer view;
-  res = PyObject_GetBuffer($input, &view, PyBUF_CONTIG_RO);
-  if (res < 0) {
+  int res;
+  const char *buf;
+  int size;
+  if (!PyArg_Parse($input, "y#", &buf, &size)) {
     PyErr_Clear();
     %argument_fail(res, "(TYPEMAP, SIZE)", $symname, $argnum);
   }
-  size = view.len;
-  buf = view.buf;
-  PyBuffer_Release(&view);
   $1 = ($1_ltype) buf;
   $2 = ($2_ltype) (size / sizeof($*1_type));
 }

@@ -60,6 +60,16 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
+#ifdef Py_LIMITED_API
+#undef PyRun_String
+#undef PyRun_SimpleString
+PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals);
+int PyRun_SimpleString(const char* str);
+int PyGILState_Check();
+#define PyBUF_READ 0x100
+#define PyBUF_WRITE 0x200
+#endif
+
 namespace lldb_private {
 namespace python {
 
@@ -255,12 +265,7 @@ public:
     m_py_obj = nullptr;
   }
 
-  void Dump() const {
-    if (m_py_obj)
-      _PyObject_Dump(m_py_obj);
-    else
-      puts("NULL");
-  }
+  void Dump() const;
 
   void Dump(Stream &strm) const;
 
