@@ -68,7 +68,7 @@ GetASTContext(ExecutionContext &ctxt, Status &error) {
 
 static ValueObjectSP
 CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType type,
-		      Status &error) {
+                      Status &error) {
   DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
