@@ -87,6 +87,8 @@ public:
   bool DeclContextIsClassMethod(void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
                                 bool *is_instance_method_ptr,
                                 ConstString *language_object_name_ptr) override;
+  bool DeclContextIsContainedInLookup(void *opaque_decl_ctx,
+                                      void *other_opaque_decl_ctx);
 
   //----------------------------------------------------------------------
   // Creating Types
@@ -194,6 +196,8 @@ public:
 
   bool IsVoidType(lldb::opaque_compiler_type_t type) override;
 
+  bool CanPassInRegisters(const CompilerType &type) override;
+
   bool IsBooleanType(lldb::opaque_compiler_type_t type);
 
   bool SupportsLanguage(lldb::LanguageType language) override;
@@ -259,8 +263,8 @@ public:
   // Exploring the type
   //----------------------------------------------------------------------
 
-  uint64_t GetBitSize(lldb::opaque_compiler_type_t type,
-                      ExecutionContextScope *exe_scope) override;
+  llvm::Optional<uint64_t> GetBitSize(lldb::opaque_compiler_type_t type,
+                           ExecutionContextScope *exe_scope) override;
 
   lldb::Encoding GetEncoding(lldb::opaque_compiler_type_t type,
                              uint64_t &count) override;
@@ -462,7 +466,8 @@ public:
   GetUserExpression(llvm::StringRef expr, llvm::StringRef prefix,
                     lldb::LanguageType language,
                     Expression::ResultType desired_type,
-                    const EvaluateExpressionOptions &options) override;
+                    const EvaluateExpressionOptions &options,
+                    ValueObject *ctx_obj) override;
 
 private:
   lldb::TargetWP m_target_wp;
