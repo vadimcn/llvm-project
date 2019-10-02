@@ -13,11 +13,13 @@
 #include "PythonDataObjects.h"
 #include "ScriptInterpreterPython.h"
 
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Host/File.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Interpreter/ScriptInterpreter.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Stream.h"
+#include "lldb/Utility/LLDBAssert.h"
 
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Casting.h"
@@ -69,6 +71,7 @@ void StructuredPythonObject::Serialize(llvm::json::OStream &s) const {
 
 void PythonObject::Dump(Stream &strm) const {
   if (m_py_obj) {
+#ifndef Py_LIMITED_API
     FILE *file = llvm::sys::RetryAfterSignal(nullptr, ::tmpfile);
     if (file) {
       ::PyObject_Print(m_py_obj, file, 0);
@@ -83,8 +86,16 @@ void PythonObject::Dump(Stream &strm) const {
       }
       ::fclose(file);
     }
+#else
+    strm << this->Repr().GetString();
+#endif
   } else
     strm.PutCString("NULL");
+}
+
+void PythonObject::Dump() const {
+  StreamFile errstrm(2, false);
+  errstrm << "object : " << this->Repr().GetString();
 }
 
 PyObjectType PythonObject::GetObjectType() const {
@@ -372,11 +383,16 @@ Expected<llvm::StringRef> PythonString::AsUTF8() const {
   if (!IsValid())
     return nullDeref();
 
-  Py_ssize_t size;
-  const char *data;
+  Py_ssize_t size = 0;
+  const char *data = nullptr;
 
 #if PY_MAJOR_VERSION >= 3
+# ifndef Py_LIMITED_API
   data = PyUnicode_AsUTF8AndSize(m_py_obj, &size);
+# else
+  // Py_LIMITED_API doesn't provide PyUnicode_AsUTF8AndSize(), but this loophole seems to work.
+  PyArg_Parse(m_py_obj, "s#", &data, &size);
+# endif 
 #else
   char *c = NULL;
   int r = PyString_AsStringAndSize(m_py_obj, &c, &size);
@@ -535,7 +551,7 @@ bool PythonList::Check(PyObject *py_obj) {
 
 uint32_t PythonList::GetSize() const {
   if (IsValid())
-    return PyList_GET_SIZE(m_py_obj);
+    return PyList_Size(m_py_obj);
   return 0;
 }
 
@@ -614,7 +630,7 @@ bool PythonTuple::Check(PyObject *py_obj) {
 
 uint32_t PythonTuple::GetSize() const {
   if (IsValid())
-    return PyTuple_GET_SIZE(m_py_obj);
+    return PyTuple_Size(m_py_obj);
   return 0;
 }
 
@@ -824,6 +840,7 @@ def main(f):
 )";
 #endif
 
+#ifndef Py_LIMITED_API
 Expected<PythonCallable::ArgInfo> PythonCallable::GetArgInfo() const {
   ArgInfo result = {};
   if (!IsValid())
@@ -895,6 +912,7 @@ Expected<PythonCallable::ArgInfo> PythonCallable::GetArgInfo() const {
 
   return result;
 }
+#endif // Py_LIMITED_API
 
 constexpr unsigned
     PythonCallable::ArgInfo::UNBOUNDED; // FIXME delete after c++17
