@@ -55,6 +55,11 @@ public:
     return nullptr;
   }
 
+  lldb::ThreadPlanSP GetStepThroughTrampolinePlan(Thread &thread,
+                                                  bool stop_others) override {
+    return {};
+  }
+
   TypeAndOrName FixUpDynamicType(const TypeAndOrName &type_and_or_name,
                                  ValueObject &static_value) override;
 
