@@ -113,7 +113,7 @@ public:
   CompilerType CreateFunctionType(const lldb_private::ConstString &name,
                                   const CompilerType &return_type,
                                   const std::vector<CompilerType> &&params,
-				  const std::vector<CompilerType> &&template_params);
+                                  const std::vector<CompilerType> &&template_params);
 
   CompilerType CreateStructType(const ConstString &name, uint32_t byte_size,
                                 bool has_discriminant);
@@ -332,7 +332,7 @@ public:
                                 std::vector<uint32_t> &child_indexes) override;
 
   lldb::TemplateArgumentKind GetTemplateArgumentKind(lldb::opaque_compiler_type_t type,
-						     size_t idx) override {
+                                                     size_t idx) override {
     // Rust currently only has types.
     return lldb::eTemplateArgumentKindType;
   }
