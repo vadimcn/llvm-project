@@ -13,6 +13,7 @@ add_lldb_tool(lldb
 
   LINK_LIBS
     liblldb
+    ${PYTHON_LIBRARIES}
 
   LINK_COMPONENTS
     Option
