@@ -188,7 +188,41 @@ extern "C" void *
 LLDBSWIGPython_GetDynamicSetting(void *module, const char *setting,
                                  const lldb::TargetSP &target_sp);
 
+static LazyBool g_enabled = eLazyBoolCalculate;
 static bool g_initialized = false;
+
+#ifdef Py_LIMITED_API
+PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals)
+{
+  PyObject* code = Py_CompileString(str, "<string>", start);
+  if (!code)
+    return nullptr;
+  PyObject* result = PyEval_EvalCode(code, globals, locals);
+  Py_DECREF(code);
+  return result;
+}
+
+int PyRun_SimpleString(const char* str)
+{
+  PyObject *m, *d, *v;
+  m = PyImport_AddModule("__main__");
+  if (m == NULL)
+      return -1;
+  d = PyModule_GetDict(m);
+  v = PyRun_String(str, Py_file_input, d, d);
+  if (v == NULL) {
+      PyErr_Print();
+      return -1;
+  }
+  Py_DECREF(v);
+  return 0;
+}
+
+int PyGILState_Check() {
+  PyThreadState* tstate = PyThreadState_Get();
+  return tstate && tstate == PyGILState_GetThisThreadState();
+}
+#endif
 
 namespace {
 
@@ -403,6 +437,7 @@ ScriptInterpreterPythonImpl::Locker::Locker(
     : ScriptInterpreterLocker(),
       m_teardown_session((on_leave & TearDownSession) == TearDownSession),
       m_python_interpreter(py_interpreter) {
+  lldbassert(g_initialized && "ScriptInterpreterPython not initialized!");
   DoAcquireLock();
   if ((on_entry & InitSession) == InitSession) {
     if (!DoInitSession(on_entry, in, out, err)) {
@@ -1054,7 +1089,10 @@ bool ScriptInterpreterPythonImpl::Interrupt() {
     if (!state)
       state = GetThreadState();
     if (state) {
-      long tid = state->thread_id;
+      long tid = 0;
+#ifndef Py_LIMITED_API
+      tid = state->thread_id;
+#endif
       PyThreadState_Swap(state);
       int num_threads = PyThreadState_SetAsyncExc(tid, PyExc_KeyboardInterrupt);
       if (log)
@@ -3200,6 +3238,16 @@ ScriptInterpreterPythonImpl::AcquireInterpreterLock() {
       this, Locker::AcquireLock | Locker::InitSession | Locker::NoSTDIN,
       Locker::FreeLock | Locker::TearDownSession));
   return py_lock;
+}
+
+bool ScriptInterpreterPython::IsEnabled() {
+  if (g_enabled == eLazyBoolCalculate) {
+    if (Py_InitializeEx && !getenv("LLDB_DISABLE_PYTHON"))
+      g_enabled = eLazyBoolYes;
+    else
+      g_enabled = eLazyBoolNo;
+  }
+  return g_enabled == eLazyBoolYes;
 }
 
 void ScriptInterpreterPythonImpl::InitializePrivate() {
