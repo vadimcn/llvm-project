@@ -27,28 +27,28 @@ namespace lldb_private {
 namespace rust {
 
 lldb::ValueObjectSP UnaryDereference(ExecutionContext &exe_ctx, lldb::ValueObjectSP addr,
-				     Status &error);
+                                     Status &error);
 lldb::ValueObjectSP UnaryAddr(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
-			      Status &error);
+                              Status &error);
 lldb::ValueObjectSP UnaryPlus(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
-			      Status &error);
+                              Status &error);
 lldb::ValueObjectSP UnaryNegate(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
-				Status &error);
+                                Status &error);
 lldb::ValueObjectSP UnaryComplement(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
-				    Status &error);
+                                    Status &error);
 lldb::ValueObjectSP UnarySizeof(ExecutionContext &exe_ctx, lldb::ValueObjectSP val,
-				Status &error);
+                                Status &error);
 
 template<typename T, bool ASSIGN>
 lldb::ValueObjectSP BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-				     lldb::ValueObjectSP right, Status &error);
+                                     lldb::ValueObjectSP right, Status &error);
 
 template<typename T>
 lldb::ValueObjectSP Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-				lldb::ValueObjectSP right, Status &error);
+                                lldb::ValueObjectSP right, Status &error);
 
 lldb::ValueObjectSP ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-				lldb::ValueObjectSP right, Status &error);
+                                lldb::ValueObjectSP right, Status &error);
 
 }
 
@@ -199,7 +199,7 @@ class RustBinaryExpression : public RustExpression {
 public:
 
   RustBinaryExpression(RustExpressionUP &&left,
-		       RustExpressionUP &&right)
+                       RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -238,7 +238,7 @@ public:
   }
 
   RustAssignExpression(RustExpressionUP &&left,
-		       RustExpressionUP &&right)
+                       RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -286,7 +286,7 @@ class RustAndAndExpression : public RustExpression {
 public:
 
   RustAndAndExpression(RustExpressionUP &&left,
-		       RustExpressionUP &&right)
+                       RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -308,7 +308,7 @@ class RustOrOrExpression : public RustExpression {
 public:
 
   RustOrOrExpression(RustExpressionUP &&left,
-		     RustExpressionUP &&right)
+                     RustExpressionUP &&right)
     : m_left(std::move(left)),
       m_right(std::move(right))
   {
@@ -331,7 +331,7 @@ public:
 
   // Either or both can be NULL here.
   RustRangeExpression(RustExpressionUP &&left,
-		      RustExpressionUP &&right,
+                      RustExpressionUP &&right,
                       bool inclusive)
     : m_left(std::move(left)),
       m_right(std::move(right)),

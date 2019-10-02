@@ -85,7 +85,7 @@ public:
       dw_attr_t attr = m_die->m_attrs.AttributeAtIndex(m_offset);
       DWARFFormValue value;
       if (!m_die->m_attrs.ExtractFormValueAtIndex(m_offset, value))
-	attr = INVALID_ATTR;
+        attr = INVALID_ATTR;
       return std::make_pair(attr, value);
     }
 
@@ -207,7 +207,7 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     case DW_AT_name:
       type_name_cstr = value.second.AsCString();
       if (type_name_cstr)
-	type_name_const_str.SetCString(type_name_cstr);
+        type_name_const_str.SetCString(type_name_cstr);
       break;
     case DW_AT_byte_size:
       byte_size = value.second.Unsigned();
@@ -238,16 +238,16 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     else if (encoding == DW_ATE_float)
       compiler_type = m_ast.CreateFloatType(type_name_const_str, byte_size);
     else if (byte_size == 0 && type_name_const_str &&
-	     strcmp(type_name_const_str.AsCString(), "()") == 0)
+             strcmp(type_name_const_str.AsCString(), "()") == 0)
       compiler_type = m_ast.CreateTupleType(type_name_const_str, byte_size, false);
     else if (encoding == DW_ATE_signed || encoding == DW_ATE_unsigned ||
              // DW_ATE_UCS seems to be less used (perhaps
              // Fortran-specific?) and since I'm not planning to have
              // rustc emit it, we ignore it here.
-	     encoding == DW_ATE_unsigned_char || encoding == DW_ATE_UTF)
+             encoding == DW_ATE_unsigned_char || encoding == DW_ATE_UTF)
       compiler_type = m_ast.CreateIntegralType(type_name_const_str,
-					       encoding == DW_ATE_signed,
-					       byte_size,
+                                               encoding == DW_ATE_signed,
+                                               byte_size,
                                                (encoding == DW_ATE_unsigned_char ||
                                                 encoding == DW_ATE_UTF));
     else
@@ -269,13 +269,13 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
     if (type) {
       CompilerType impl = type->GetForwardCompilerType();
       if (die.Tag() == DW_TAG_pointer_type) {
-	int byte_size = die.GetCU()->GetAddressByteSize();
-	m_ast.SetAddressByteSize(byte_size);
-	compiler_type = m_ast.CreatePointerType(type_name_const_str, impl, byte_size);
-	encoding_data_type = Type::eEncodingIsPointerUID;
+        int byte_size = die.GetCU()->GetAddressByteSize();
+        m_ast.SetAddressByteSize(byte_size);
+        compiler_type = m_ast.CreatePointerType(type_name_const_str, impl, byte_size);
+        encoding_data_type = Type::eEncodingIsPointerUID;
       } else {
-	compiler_type = m_ast.CreateTypedefType(type_name_const_str, impl);
-	encoding_data_type = Type::eEncodingIsTypedefUID;
+        compiler_type = m_ast.CreateTypedefType(type_name_const_str, impl);
+        encoding_data_type = Type::eEncodingIsTypedefUID;
       }
     }
     break;
@@ -287,9 +287,9 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log, const DWARFDI
   }
 
   return TypeSP(new Type(die.GetID(), dwarf, type_name_const_str,
-			 byte_size, NULL, encoding_uid,
-			 encoding_data_type, Declaration(), compiler_type,
-			 resolve_state));
+                         byte_size, NULL, encoding_uid,
+                         encoding_data_type, Declaration(), compiler_type,
+                         resolve_state));
 }
 
 TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
@@ -314,10 +314,10 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_subrange_type) {
       for (auto &&value : IterableDIEAttrs(child_die)) {
-	if (value.first == DW_AT_count) {
-	  count = value.second.Unsigned();
-	  break;
-	}
+        if (value.first == DW_AT_count) {
+          count = value.second.Unsigned();
+          break;
+        }
       }
       break;
     }
@@ -328,9 +328,9 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
 
   ConstString type_name_const_str = compiler_type.GetTypeName();
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str,
-			  element_type->GetByteSize(), NULL, type_die_offset,
-			  Type::eEncodingIsUID, Declaration(), compiler_type,
-			  Type::eResolveStateFull));
+                          element_type->GetByteSize(), NULL, type_die_offset,
+                          Type::eEncodingIsUID, Declaration(), compiler_type,
+                          Type::eResolveStateFull));
   type_sp->SetEncodingType(element_type);
   return type_sp;
 }
@@ -351,17 +351,17 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
 
     case DW_AT_external:
       if (attr.second.Unsigned()) {
-	if (storage == clang::SC_None)
-	  storage = clang::SC_Extern;
-	else
-	  storage = clang::SC_PrivateExtern;
+        if (storage == clang::SC_None)
+          storage = clang::SC_Extern;
+        else
+          storage = clang::SC_PrivateExtern;
       }
       break;
 
     case DW_AT_type: {
       Type *type = die.ResolveTypeUID(DIERef(attr.second));
       if (type) {
-	return_type = type->GetForwardCompilerType();
+        return_type = type->GetForwardCompilerType();
       }
       break;
     }
@@ -378,29 +378,29 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_formal_parameter) {
       for (auto &&attr : IterableDIEAttrs(child_die)) {
-	if (attr.first == DW_AT_type) {
-	  Type *type = die.ResolveTypeUID(DIERef(attr.second));
-	  if (type) {
-	    function_param_types.push_back(type->GetForwardCompilerType());
-	  }
-	  break;
-	}
+        if (attr.first == DW_AT_type) {
+          Type *type = die.ResolveTypeUID(DIERef(attr.second));
+          if (type) {
+            function_param_types.push_back(type->GetForwardCompilerType());
+          }
+          break;
+        }
       }
     } else if (child_die.Tag() == DW_TAG_template_type_parameter) {
       Type *param_type = dwarf->ResolveTypeUID(child_die, true);
       if (param_type) {
-	template_params.push_back(param_type->GetForwardCompilerType());
+        template_params.push_back(param_type->GetForwardCompilerType());
       }
     }
   }
 
   CompilerType compiler_type = m_ast.CreateFunctionType(type_name_const_str, return_type,
-							std::move(function_param_types),
-							std::move(template_params));
+                                                        std::move(function_param_types),
+                                                        std::move(template_params));
 
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str, 0, NULL,
-			  LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-			  compiler_type, Type::eResolveStateFull));
+                          LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
+                          compiler_type, Type::eResolveStateFull));
 
   return type_sp;
 }
@@ -443,9 +443,9 @@ std::vector<size_t> DWARFASTParserRust::ParseDiscriminantPath(const char **in_st
 }
 
 void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
-						  std::vector<size_t> &&path,
-						  uint64_t &offset,
-						  uint64_t &byte_size) {
+                                                  std::vector<size_t> &&path,
+                                                  uint64_t &offset,
+                                                  uint64_t &byte_size) {
   offset = 0;
 
   for (size_t index : path) {
@@ -458,12 +458,12 @@ void DWARFASTParserRust::FindDiscriminantLocation(CompilerType type,
     int32_t this_offset;
 
     type = m_ast.GetChildCompilerTypeAtIndex(type.GetOpaqueQualType(), nullptr, index,
-					     false, false, true,
-					     ignore_name,
-					     this_size, this_offset,
-					     bitsize_ignore, bitoffset_ignore,
-					     isbase_ignore, isderef_ignore,
-					     nullptr, lang_flags_ignore);
+                                             false, false, true,
+                                             ignore_name,
+                                             this_size, this_offset,
+                                             bitsize_ignore, bitoffset_ignore,
+                                             isbase_ignore, isderef_ignore,
+                                             nullptr, lang_flags_ignore);
     offset += this_offset;
     // The last time this is done, it will hold the size of the final
     // field, which is what we want.
@@ -480,8 +480,8 @@ bool DWARFASTParserRust::IsPossibleEnumVariant(const DWARFDIE &die) {
   for (auto &&child_die : IterableDIEChildren(die)) {
     if (child_die.Tag() == DW_TAG_member) {
       for (auto &&attr : IterableDIEAttrs(child_die)) {
-	if (attr.first == DW_AT_name) {
-	  return strcmp(attr.second.AsCString(), "RUST$ENUM$DISR") == 0;
+        if (attr.first == DW_AT_name) {
+          return strcmp(attr.second.AsCString(), "RUST$ENUM$DISR") == 0;
         }
       }
       // No name, so whatever it is, it isn't an enum variant.
@@ -496,9 +496,9 @@ bool DWARFASTParserRust::IsPossibleEnumVariant(const DWARFDIE &die) {
 
 std::vector<DWARFASTParserRust::Field>
 DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discriminant_path,
-				bool &is_tuple,
-				uint64_t &discr_offset, uint64_t &discr_byte_size,
-				bool &saw_discr, std::vector<CompilerType> &template_params) {
+                                bool &is_tuple,
+                                uint64_t &discr_offset, uint64_t &discr_byte_size,
+                                bool &saw_discr, std::vector<CompilerType> &template_params) {
   SymbolFileDWARF *dwarf = die.GetDWARF();
 
   // We construct a list of fields and then apply them later so that
@@ -535,24 +535,24 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
     if (is_variant && child_die.Tag() == DW_TAG_variant) {
       // Find the discriminant, if it exists.
       for (auto &&attr : IterableDIEAttrs(child_die)) {
-	if (attr.first == DW_AT_discr_value) {
-	  new_field.discriminant = attr.second.Unsigned();
-	  break;
-	}
+        if (attr.first == DW_AT_discr_value) {
+          new_field.discriminant = attr.second.Unsigned();
+          break;
+        }
       }
 
       // Use the child that is a member.
       bool found = false;
       for (auto &&variant_child_die : IterableDIEChildren(child_die)) {
-	if (variant_child_die.Tag() == DW_TAG_member) {
-	  found = true;
-	  child_die = variant_child_die;
-	  break;
-	}
+        if (variant_child_die.Tag() == DW_TAG_member) {
+          found = true;
+          child_die = variant_child_die;
+          break;
+        }
       }
       if (!found) {
-	// Just ignore this variant.
-	continue;
+        // Just ignore this variant.
+        continue;
       }
 
       // Fall through and process the variant's child as if it were a
@@ -561,65 +561,65 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 
     if (child_die.Tag() == DW_TAG_member) {
       for (auto &&attr : IterableDIEAttrs(child_die)) {
-	switch (attr.first) {
-	case DW_AT_name:
-	  new_field.name = attr.second.AsCString();
-	  if (fields.size() == 0) {
-	    if (strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
-	      new_field.is_discriminant = true;
-	    else if (starts_with(new_field.name, RUST_ENCODED_PREFIX)) {
-	      // The "non-zero" optimization has been applied.
-	      // In this case, we'll see a single field like:
-	      //   RUST$ENCODED$ENUM$n0$n1...$Name
-	      // Here n0, n1, ... are integers that describe the path
-	      // to the discriminant.  When the discriminant (and
-	      // integer) is 0, the enum has the value Name, a
-	      // unit-like struct.  However when it is non-zero, the
-	      // enum has the value of this field's type.
+        switch (attr.first) {
+        case DW_AT_name:
+          new_field.name = attr.second.AsCString();
+          if (fields.size() == 0) {
+            if (strcmp(new_field.name, "RUST$ENUM$DISR") == 0)
+              new_field.is_discriminant = true;
+            else if (starts_with(new_field.name, RUST_ENCODED_PREFIX)) {
+              // The "non-zero" optimization has been applied.
+              // In this case, we'll see a single field like:
+              //   RUST$ENCODED$ENUM$n0$n1...$Name
+              // Here n0, n1, ... are integers that describe the path
+              // to the discriminant.  When the discriminant (and
+              // integer) is 0, the enum has the value Name, a
+              // unit-like struct.  However when it is non-zero, the
+              // enum has the value of this field's type.
 
-	      // Here we're going to push an initial field for the
-	      // unit-like struct.  Note that the constructor sets the
-	      // discriminant to the correct value -- zero.
-	      Field unit_field;
-	      unit_field.name = new_field.name;
-	      discriminant_path = ParseDiscriminantPath(&unit_field.name);
-	      unit_field.is_elided = true;
-	      fields.push_back(unit_field);
+              // Here we're going to push an initial field for the
+              // unit-like struct.  Note that the constructor sets the
+              // discriminant to the correct value -- zero.
+              Field unit_field;
+              unit_field.name = new_field.name;
+              discriminant_path = ParseDiscriminantPath(&unit_field.name);
+              unit_field.is_elided = true;
+              fields.push_back(unit_field);
 
-	      // The actual field is the default variant.
-	      new_field.is_default = true;
+              // The actual field is the default variant.
+              new_field.is_default = true;
               new_field.name = nullptr;
               encoded_enum = true;
-	    }
-	  }
-	  break;
-	case DW_AT_type:
-	  new_field.type = attr.second;
+            }
+          }
+          break;
+        case DW_AT_type:
+          new_field.type = attr.second;
           if (could_be_enum && !encoded_enum) {
             could_be_enum = IsPossibleEnumVariant(dwarf->GetDIE(DIERef(new_field.type)));
           }
-	  break;
-	case DW_AT_data_member_location:
-	  if (attr.second.BlockData()) {
-	    Value initialValue(0);
-	    Value memberOffset(0);
-	    const DWARFDataExtractor &debug_info_data =
-	      child_die.GetDWARF()->get_debug_info_data();
-	    uint32_t block_length = attr.second.Unsigned();
-	    uint32_t block_offset = attr.second.BlockData() - debug_info_data.GetDataStart();
-	    if (DWARFExpression::Evaluate(
-					  NULL, // ExecutionContext *
-					  NULL, // RegisterContext *
-					  module_sp, debug_info_data, die.GetCU(), block_offset,
-					  block_length, eRegisterKindDWARF, &initialValue, NULL,
-					  memberOffset, NULL)) {
-	      new_field.byte_offset = memberOffset.ResolveValue(NULL).UInt();
-	    }
-	  } else {
-	    new_field.byte_offset = attr.second.Unsigned();
-	  }
-	  break;
-	}
+          break;
+        case DW_AT_data_member_location:
+          if (attr.second.BlockData()) {
+            Value initialValue(0);
+            Value memberOffset(0);
+            const DWARFDataExtractor &debug_info_data =
+              child_die.GetDWARF()->get_debug_info_data();
+            uint32_t block_length = attr.second.Unsigned();
+            uint32_t block_offset = attr.second.BlockData() - debug_info_data.GetDataStart();
+            if (DWARFExpression::Evaluate(
+                                          NULL, // ExecutionContext *
+                                          NULL, // RegisterContext *
+                                          module_sp, debug_info_data, die.GetCU(), block_offset,
+                                          block_length, eRegisterKindDWARF, &initialValue, NULL,
+                                          memberOffset, NULL)) {
+              new_field.byte_offset = memberOffset.ResolveValue(NULL).UInt();
+            }
+          } else {
+            new_field.byte_offset = attr.second.Unsigned();
+          }
+          break;
+        }
       }
     }
 
@@ -631,36 +631,36 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 
       Type *type = die.ResolveTypeUID(DIERef(new_field.type));
       if (type) {
-	lldb_private::CompilerType ctype = type->GetFullCompilerType();
-	discr_byte_size = m_ast.GetBitSize(ctype.GetOpaqueQualType(), nullptr) / 8;
+        lldb_private::CompilerType ctype = type->GetFullCompilerType();
+        discr_byte_size = m_ast.GetBitSize(ctype.GetOpaqueQualType(), nullptr) / 8;
       }
     } else if (child_die.Tag() == DW_TAG_variant_part) {
       // New-style enum representation -- nothing useful is in the
       // enclosing struct, so we can just recurse here.
       return ParseFields(child_die, discriminant_path, is_tuple,
-			 discr_offset, discr_byte_size, saw_discr, template_params);
+                         discr_offset, discr_byte_size, saw_discr, template_params);
     } else if (child_die.Tag() == DW_TAG_member) {
       if (new_field.is_discriminant) {
-	// Don't check this field name, and don't increment field_index.
-	// When we see a tuple with fields like
-	//   RUST$ENUM$DISR
-	//   __0
-	//   __1
-	//   etc
-	// ... it means the tuple is a member type of an enum.
+        // Don't check this field name, and don't increment field_index.
+        // When we see a tuple with fields like
+        //   RUST$ENUM$DISR
+        //   __0
+        //   __1
+        //   etc
+        // ... it means the tuple is a member type of an enum.
       } else if (numeric_names) {
-	char buf[32];
-	snprintf (buf, sizeof (buf), "__%u", field_index);
-	if (!new_field.name || strcmp(new_field.name, buf) != 0)
-	  numeric_names = false;
-	++field_index;
+        char buf[32];
+        snprintf (buf, sizeof (buf), "__%u", field_index);
+        if (!new_field.name || strcmp(new_field.name, buf) != 0)
+          numeric_names = false;
+        ++field_index;
       }
 
       fields.push_back(new_field);
     } else if (child_die.Tag() == DW_TAG_template_type_parameter) {
       Type *param_type = dwarf->ResolveTypeUID(child_die, true);
       if (param_type) {
-	template_params.push_back(param_type->GetForwardCompilerType());
+        template_params.push_back(param_type->GetForwardCompilerType());
       }
     }
   }
@@ -720,7 +720,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   // Only try and unique the type if it has a name.
   if (type_name_const_str &&
       dwarf->GetUniqueDWARFASTTypeMap().Find(type_name_const_str, die, &decl,
-					     byte_size_valid ? byte_size : -1, ast_entry)) {
+                                             byte_size_valid ? byte_size : -1, ast_entry)) {
     // We have already parsed this type.
     type_sp = ast_entry.m_type_sp;
     if (type_sp) {
@@ -742,8 +742,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   std::vector<size_t> discriminant_path;
   std::vector<CompilerType> template_params;
   std::vector<Field> fields = ParseFields(die, discriminant_path, is_tuple,
-					  discr_offset, discr_byte_size, saw_discr,
-					  template_params);
+                                          discr_offset, discr_byte_size, saw_discr,
+                                          template_params);
 
   // This is true if this is a union, there are multiple fields and
   // each field's type has a discriminant.
@@ -771,9 +771,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     } else {
       Type *type = die.ResolveTypeUID(DIERef(field.type));
       if (type) {
-	field.compiler_type = type->GetFullCompilerType();
-	if (all_have_discriminants)
-	  all_have_discriminants = m_ast.TypeHasDiscriminant(field.compiler_type);
+        field.compiler_type = type->GetFullCompilerType();
+        if (all_have_discriminants)
+          all_have_discriminants = m_ast.TypeHasDiscriminant(field.compiler_type);
       }
     }
 
@@ -787,7 +787,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
   bool compiler_type_was_created = false;
   CompilerType compiler_type(&m_ast,
-			     dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
+                             dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
   if (!compiler_type) {
     compiler_type_was_created = true;
 
@@ -797,26 +797,26 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
     if (saw_discr) {
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
-					   discr_offset, discr_byte_size);
+                                           discr_offset, discr_byte_size);
     } else if (all_have_discriminants) {
       // In this case, the discriminant is easily computed as the 0th
       // field of the 0th field.
       discriminant_path = std::vector<size_t> { 0 };
 
       FindDiscriminantLocation(fields[0].compiler_type, std::move(discriminant_path),
-			       discr_offset, discr_byte_size);
+                               discr_offset, discr_byte_size);
 
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
-					   discr_offset, discr_byte_size);
+                                           discr_offset, discr_byte_size);
     } else if (!discriminant_path.empty()) {
       CompilerType start_type = fields[discriminant_path[0]].compiler_type;
       discriminant_path.erase(discriminant_path.begin());
 
       FindDiscriminantLocation(start_type, std::move(discriminant_path),
-			       discr_offset, discr_byte_size);
+                               discr_offset, discr_byte_size);
 
       compiler_type = m_ast.CreateEnumType(type_name_const_str, byte_size,
-					   discr_offset, discr_byte_size);
+                                           discr_offset, discr_byte_size);
     } else if (is_union)
       compiler_type = m_ast.CreateUnionType(type_name_const_str, byte_size);
     else if (is_tuple)
@@ -826,9 +826,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
   }
 
   type_sp.reset(new Type(die.GetID(), dwarf, type_name_const_str,
-			 byte_size, NULL, LLDB_INVALID_UID,
-			 Type::eEncodingIsUID, &decl, compiler_type,
-			 Type::eResolveStateForward));
+                         byte_size, NULL, LLDB_INVALID_UID,
+                         Type::eEncodingIsUID, &decl, compiler_type,
+                         Type::eResolveStateForward));
 
   // Now add the fields.
   int fieldno = 0;
@@ -836,15 +836,15 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     if (field.compiler_type) {
       ConstString name;
       if (is_tuple) {
-	char buf[32];
-	snprintf (buf, sizeof (buf), "%u", fieldno);
-	++fieldno;
-	name = ConstString(buf);
+        char buf[32];
+        snprintf (buf, sizeof (buf), "%u", fieldno);
+        ++fieldno;
+        name = ConstString(buf);
       } else {
-	name = ConstString(field.name);
+        name = ConstString(field.name);
       }
       m_ast.AddFieldToStruct(compiler_type, name, field.compiler_type, field.byte_offset,
-			     field.is_default, field.discriminant);
+                             field.is_default, field.discriminant);
     }
   }
 
@@ -892,7 +892,7 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE
 
     case DW_AT_type:
       if (Type *type = die.ResolveTypeUID(DIERef(attr.second))) {
-	underlying_type = type->GetFullCompilerType();
+        underlying_type = type->GetFullCompilerType();
       }
       break;
     }
@@ -919,18 +919,18 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE
     for (auto &&attr : IterableDIEAttrs(child_die)) {
       switch (attr.first) {
       case DW_AT_name:
-	name = attr.second.AsCString();
-	break;
+        name = attr.second.AsCString();
+        break;
       case DW_AT_const_value:
-	saw_value = true;
-	value = attr.second.Unsigned();
-	break;
+        saw_value = true;
+        value = attr.second.Unsigned();
+        break;
       }
 
       if (saw_value && !name.empty()) {
-	values[value] = name;
+        values[value] = name;
       } else {
-	dwarf->GetObjectFile()->GetModule()->LogMessage(
+        dwarf->GetObjectFile()->GetModule()->LogMessage(
           log, "DWARFASTParserRust::ParseCLikeEnum (die = 0x%8.8x) %s "
                "is invalid)",
           child_die.GetOffset(), DW_TAG_value_to_name(die.Tag()));
@@ -940,11 +940,11 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log, const DWARFDIE
 
   Declaration decl;
   CompilerType compiler_type = m_ast.CreateCLikeEnumType(type_name_const_str,
-							 underlying_type,
-							 std::move(values));
+                                                         underlying_type,
+                                                         std::move(values));
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str, 0, NULL,
-			  LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-			  compiler_type, Type::eResolveStateFull));
+                          LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
+                          compiler_type, Type::eResolveStateFull));
 
   return type_sp;
 }
@@ -983,26 +983,26 @@ TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
       case DW_TAG_typedef:
       case DW_TAG_template_type_parameter:
       case DW_TAG_unspecified_type:
-	type_sp = ParseSimpleType(log, die);
-	break;
+        type_sp = ParseSimpleType(log, die);
+        break;
 
       case DW_TAG_union_type:
       case DW_TAG_structure_type:
-	type_sp = ParseStructureType(die);
-	break;
+        type_sp = ParseStructureType(die);
+        break;
 
       case DW_TAG_subprogram:
       case DW_TAG_subroutine_type:
-	type_sp = ParseFunctionType(die);
-	break;
+        type_sp = ParseFunctionType(die);
+        break;
 
       case DW_TAG_array_type:
-	type_sp = ParseArrayType(die);
-	break;
+        type_sp = ParseArrayType(die);
+        break;
 
       case DW_TAG_enumeration_type:
-	type_sp = ParseCLikeEnum(log, die);
-	break;
+        type_sp = ParseCLikeEnum(log, die);
+        break;
 
       default:
         dwarf->GetObjectFile()->GetModule()->ReportError(
@@ -1045,14 +1045,14 @@ TypeSP DWARFASTParserRust::ParseTypeFromDWARF(
 }
 
 bool DWARFASTParserRust::CompleteTypeFromDWARF(const DWARFDIE &die,
-					       lldb_private::Type *type,
-					       CompilerType &compiler_type) {
+                                               lldb_private::Type *type,
+                                               CompilerType &compiler_type) {
   // We don't currently use type completion for Rust.
   return bool(die);
 }
 
 Function *DWARFASTParserRust::ParseFunctionFromDWARF(CompileUnit &comp_unit,
-						     const DWARFDIE &die) {
+                                                     const DWARFDIE &die) {
   DWARFRangeList func_ranges;
   const char *name = NULL;
   const char *mangled = NULL;

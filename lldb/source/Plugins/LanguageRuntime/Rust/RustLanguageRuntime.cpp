@@ -92,7 +92,7 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
     Status error;
     uint64_t discriminant =
       process->ReadUnsignedIntegerFromMemory(original_ptr + discr_offset, discr_byte_size,
-					     0, error);
+                                             0, error);
     if (!error.Success()) {
       return false;
     }
