@@ -127,12 +127,7 @@ public:
       Py_XINCREF(m_py_obj);
   }
 
-  void Dump() const {
-    if (m_py_obj)
-      _PyObject_Dump(m_py_obj);
-    else
-      puts("NULL");
-  }
+  void Dump() const;
 
   void Dump(Stream &strm) const;
 
@@ -418,12 +413,14 @@ public:
 
 class PythonCallable : public PythonObject {
 public:
+#ifndef Py_LIMITED_API
   struct ArgInfo {
     size_t count;
     bool is_bound_method : 1;
     bool has_varargs : 1;
     bool has_kwargs : 1;
   };
+#endif
 
   PythonCallable();
   PythonCallable(PyRefType type, PyObject *o);
@@ -436,9 +433,9 @@ public:
   using PythonObject::Reset;
 
   void Reset(PyRefType type, PyObject *py_obj) override;
-
+#ifndef Py_LIMITED_API
   ArgInfo GetNumArguments() const;
-
+#endif
   PythonObject operator()();
 
   PythonObject operator()(std::initializer_list<PyObject *> args);
