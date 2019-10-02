@@ -1188,6 +1188,11 @@ bool RustASTContext::IsVoidType(lldb::opaque_compiler_type_t type) {
     strcmp(tuple->Name().AsCString(), "()") == 0 && tuple->FieldCount() == 0;
 }
 
+bool RustASTContext::CanPassInRegisters(const CompilerType &type) {
+  // Rust does not have the exception for types with "non-trivial" constructors.
+  return true;
+}
+
 bool RustASTContext::SupportsLanguage(lldb::LanguageType language) {
   return language == eLanguageTypeRust;
 }
@@ -1367,10 +1372,10 @@ RustASTContext::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
 // Exploring the type
 //----------------------------------------------------------------------
 
-uint64_t RustASTContext::GetBitSize(lldb::opaque_compiler_type_t type,
-                                    ExecutionContextScope *exe_scope) {
+llvm::Optional<uint64_t> RustASTContext::GetBitSize(lldb::opaque_compiler_type_t type,
+                                                    ExecutionContextScope *exe_scope) {
   if (!type)
-    return 0;
+    return {};
   RustType *t = static_cast<RustType *>(type);
   return t->ByteSize() * 8;
 }
@@ -2050,7 +2055,8 @@ DWARFASTParser *RustASTContext::GetDWARFParser() {
 UserExpression *RustASTContextForExpr::GetUserExpression(
     llvm::StringRef expr, llvm::StringRef prefix, lldb::LanguageType language,
     Expression::ResultType desired_type,
-    const EvaluateExpressionOptions &options) {
+    const EvaluateExpressionOptions &options,
+    ValueObject *ctx_obj) {
   TargetSP target = m_target_wp.lock();
   if (target)
     return new RustUserExpression(*target, expr, prefix, language, desired_type,
@@ -2095,6 +2101,11 @@ bool RustASTContext::DeclContextIsClassMethod(void *opaque_decl_ctx,
                                               bool *is_instance_method_ptr,
                                               ConstString *language_object_name_ptr) {
   return false;
+}
+
+bool RustASTContext::DeclContextIsContainedInLookup(void *opaque_decl_ctx,
+                                                    void *other_opaque_decl_ctx) {
+  return opaque_decl_ctx == other_opaque_decl_ctx;
 }
 
 std::vector<CompilerDecl>
