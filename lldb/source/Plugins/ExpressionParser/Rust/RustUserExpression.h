@@ -23,7 +23,7 @@ public:
                      llvm::StringRef prefix, lldb::LanguageType language,
                      ResultType desired_type,
                      const EvaluateExpressionOptions &options)
-    : UserExpression(exe_scope, expr, prefix, language, desired_type, options)
+    : UserExpression(exe_scope, expr, prefix, language, desired_type, options, eKindUserExpression)
   {
   }
 
