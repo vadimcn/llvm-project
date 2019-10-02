@@ -15,10 +15,12 @@
 #include "PythonDataObjects.h"
 #include "ScriptInterpreterPython.h"
 
+#include "lldb/Core/StreamFile.h"
 #include "lldb/Host/File.h"
 #include "lldb/Host/FileSystem.h"
 #include "lldb/Interpreter/ScriptInterpreter.h"
 #include "lldb/Utility/Stream.h"
+#include "lldb/Utility/LLDBAssert.h"
 
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ConvertUTF.h"
@@ -37,6 +39,7 @@ void StructuredPythonObject::Dump(Stream &s, bool pretty_print) const {
 
 void PythonObject::Dump(Stream &strm) const {
   if (m_py_obj) {
+#ifndef Py_LIMITED_API
     FILE *file = llvm::sys::RetryAfterSignal(nullptr, ::tmpfile);
     if (file) {
       ::PyObject_Print(m_py_obj, file, 0);
@@ -51,8 +54,16 @@ void PythonObject::Dump(Stream &strm) const {
       }
       ::fclose(file);
     }
+#else
+    strm << this->Repr().GetString();
+#endif
   } else
     strm.PutCString("NULL");
+}
+
+void PythonObject::Dump() const {
+  StreamFile errstrm(2, false);
+  errstrm << "object : " << this->Repr().GetString();
 }
 
 PyObjectType PythonObject::GetObjectType() const {
@@ -388,11 +399,16 @@ llvm::StringRef PythonString::GetString() const {
   if (!IsValid())
     return llvm::StringRef();
 
-  Py_ssize_t size;
-  const char *data;
+  Py_ssize_t size = 0;
+  const char *data = nullptr;
 
 #if PY_MAJOR_VERSION >= 3
+# ifndef Py_LIMITED_API
   data = PyUnicode_AsUTF8AndSize(m_py_obj, &size);
+# else
+  // Py_LIMITED_API doesn't provide PyUnicode_AsUTF8AndSize(), but this loophole seems to work.
+  PyArg_Parse(m_py_obj, "s#", &data, &size);
+# endif 
 #else
   char *c;
   PyString_AsStringAndSize(m_py_obj, &c, &size);
@@ -599,7 +615,7 @@ void PythonList::Reset(PyRefType type, PyObject *py_obj) {
 
 uint32_t PythonList::GetSize() const {
   if (IsValid())
-    return PyList_GET_SIZE(m_py_obj);
+    return PyList_Size(m_py_obj);
   return 0;
 }
 
@@ -699,7 +715,7 @@ void PythonTuple::Reset(PyRefType type, PyObject *py_obj) {
 
 uint32_t PythonTuple::GetSize() const {
   if (IsValid())
-    return PyTuple_GET_SIZE(m_py_obj);
+    return PyTuple_Size(m_py_obj);
   return 0;
 }
 
@@ -786,7 +802,7 @@ PythonObject PythonDictionary::GetItemForKey(const PythonObject &key) const {
 void PythonDictionary::SetItemForKey(const PythonObject &key,
                                      const PythonObject &value) {
   if (IsAllocated() && key.IsValid() && value.IsValid())
-    PyDict_SetItem(m_py_obj, key.get(), value.get());
+    lldbassert(PyDict_SetItem(m_py_obj, key.get(), value.get()) == 0);
 }
 
 StructuredData::DictionarySP
@@ -887,6 +903,7 @@ void PythonCallable::Reset(PyRefType type, PyObject *py_obj) {
   PythonObject::Reset(PyRefType::Borrowed, result.get());
 }
 
+#ifndef Py_LIMITED_API
 PythonCallable::ArgInfo PythonCallable::GetNumArguments() const {
   ArgInfo result = {0, false, false, false};
   if (!IsValid())
@@ -926,6 +943,7 @@ PythonCallable::ArgInfo PythonCallable::GetNumArguments() const {
   result.has_kwargs = !!(code->co_flags & CO_VARKEYWORDS);
   return result;
 }
+#endif
 
 PythonObject PythonCallable::operator()() {
   return PythonObject(PyRefType::Owned, PyObject_CallObject(m_py_obj, nullptr));

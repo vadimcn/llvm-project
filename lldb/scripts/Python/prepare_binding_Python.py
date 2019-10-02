@@ -205,6 +205,7 @@ def do_swig_rebuild(options, dependency_file, config_build_dir, settings):
             "-shadow",
             "-python",
             "-threads",
+            "-py3-stable-abi",
             "-I" + os.path.normpath(os.path.join(options.src_root, "include")),
             "-I" + os.path.curdir,
             "-D__STDC_LIMIT_MACROS",

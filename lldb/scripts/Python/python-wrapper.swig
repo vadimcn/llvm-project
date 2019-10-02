@@ -129,7 +129,7 @@ LLDBSwigPythonCallTypeScript
 
     PyObject *pfunc_impl = nullptr;
 
-    if (pyfunct_wrapper && *pyfunct_wrapper && PyFunction_Check (*pyfunct_wrapper))
+    if (pyfunct_wrapper && *pyfunct_wrapper)
     {
         pfunc_impl = (PyObject*)(*pyfunct_wrapper);
         if (pfunc_impl->ob_refcnt == 1)
@@ -163,15 +163,22 @@ LLDBSwigPythonCallTypeScript
     }
 
     PythonObject result;
-    auto argc = pfunc.GetNumArguments();
-    // if the third argument is supported, or varargs are allowed
     PythonObject value_arg(PyRefType::Owned, SBTypeToSWIGWrapper(sb_value));
     PythonObject options_arg(PyRefType::Owned, SBTypeToSWIGWrapper(sb_options));
+#ifndef Py_LIMITED_API
+    auto argc = pfunc.GetNumArguments();
+    // if the third argument is supported, or varargs are allowed
     if (argc.count == 3 || argc.has_varargs)
         result = pfunc(value_arg,dict,options_arg);
     else
         result = pfunc(value_arg,dict);
-
+#else
+    result = pfunc(value_arg,dict,options_arg);
+    if (PyErr_Occurred() == PyExc_TypeError) {
+        PyErr_Clear();
+        result = pfunc(value_arg,dict);
+    }
+#endif
     retval = result.Str().GetString().str();
 
     return true;
@@ -476,11 +483,22 @@ LLDBSwigPython_CalculateNumChildren
         return 0;
 
     PythonObject result;
+    bool noarg = false;
+#ifndef Py_LIMITED_API
     auto argc = pfunc.GetNumArguments();
     if (argc.count == 1)
         result = pfunc();
     else if (argc.count == 2)
         result = pfunc(PythonInteger(max));
+    noarg == (argc.count == 1);
+#else
+    result = pfunc(PythonInteger(max));
+    if (PyErr_Occurred() == PyExc_TypeError) {
+        noarg = true;
+        PyErr_Clear();
+        result = pfunc();
+    }
+#endif
 
     if (!result.IsAllocated())
         return 0;
@@ -497,7 +515,7 @@ LLDBSwigPython_CalculateNumChildren
         PyErr_Clear();
     }
 
-    if (argc.count == 1)
+    if (noarg)
         ret_val = std::min(ret_val, static_cast<size_t>(max));
 
     return ret_val;
@@ -700,15 +718,22 @@ LLDBSwigPythonCallCommand
 
     // pass the pointer-to cmd_retobj_sb or watch the underlying object disappear from under you
     // see comment above for SBCommandReturnObjectReleaser for further details
-    auto argc = pfunc.GetNumArguments();
     PythonObject debugger_arg(PyRefType::Owned, SBTypeToSWIGWrapper(debugger_sb));
     PythonObject exe_ctx_arg(PyRefType::Owned, SBTypeToSWIGWrapper(exe_ctx_sb));
     PythonObject cmd_retobj_arg(PyRefType::Owned, SBTypeToSWIGWrapper(&cmd_retobj_sb));
-
+#ifndef Py_LIMITED_API
+    auto argc = pfunc.GetNumArguments();
     if (argc.count == 5 || argc.is_bound_method || argc.has_varargs)
         pfunc(debugger_arg, PythonString(args), exe_ctx_arg, cmd_retobj_arg, dict);
     else
         pfunc(debugger_arg, PythonString(args), cmd_retobj_arg, dict);
+#else
+    pfunc(debugger_arg, PythonString(args), exe_ctx_arg, cmd_retobj_arg, dict);
+    if (PyErr_Occurred() == PyExc_TypeError) {
+        PyErr_Clear();
+        pfunc(debugger_arg, PythonString(args), cmd_retobj_arg, dict);
+    }
+#endif
 
     return true;
 }
