@@ -45,6 +45,7 @@ if (LLDB_ENABLE_PYTHON)
         -shadow
         -python
         -threads
+        -py3-stable-abi
         -o ${CMAKE_CURRENT_BINARY_DIR}/LLDBWrapPython.cpp
         ${LLDB_SOURCE_DIR}/bindings/python.swig
     VERBATIM

@@ -1012,7 +1012,10 @@ bool ScriptInterpreterPythonImpl::Interrupt() {
     if (!state)
       state = GetThreadState();
     if (state) {
-      long tid = state->thread_id;
+      long tid = 0;
+#ifndef Py_LIMITED_API
+      tid = state->thread_id;
+#endif
       PyThreadState_Swap(state);
       int num_threads = PyThreadState_SetAsyncExc(tid, PyExc_KeyboardInterrupt);
       LLDB_LOGF(log,
