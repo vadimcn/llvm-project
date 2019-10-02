@@ -71,18 +71,18 @@ private:
 
   std::vector<size_t> ParseDiscriminantPath(const char **in_str);
   void FindDiscriminantLocation(lldb_private::CompilerType type,
-				std::vector<size_t> &&path,
-				uint64_t &offset, uint64_t &byte_size);
+                                std::vector<size_t> &&path,
+                                uint64_t &offset, uint64_t &byte_size);
   bool IsPossibleEnumVariant(const DWARFDIE &die);
 
   struct Field {
     Field()
       : is_discriminant(false),
-	is_elided(false),
-	name(nullptr),
-	byte_offset(-1),
-	is_default(false),
-	discriminant(0)
+        is_elided(false),
+        name(nullptr),
+        byte_offset(-1),
+        is_default(false),
+        discriminant(0)
     {
     }
 
@@ -101,11 +101,11 @@ private:
   };
 
   std::vector<Field> ParseFields(const DWARFDIE &die,
-				 std::vector<size_t> &discriminant_path,
-				 bool &is_tuple,
-				 uint64_t &discr_offset, uint64_t &discr_byte_size,
-				 bool &saw_discr,
-				 std::vector<lldb_private::CompilerType> &template_params);
+                                 std::vector<size_t> &discriminant_path,
+                                 bool &is_tuple,
+                                 uint64_t &discr_offset, uint64_t &discr_byte_size,
+                                 bool &saw_discr,
+                                 std::vector<lldb_private::CompilerType> &template_params);
 
   lldb_private::RustASTContext &m_ast;
 
