@@ -128,10 +128,8 @@ if(lldb_python_wrapper)
   endif ()
 endif()
 
-set_target_properties(liblldb
-  PROPERTIES
-  VERSION ${LLDB_VERSION}
-)
+set_property(TARGET liblldb PROPERTY VERSION)
+set_property(TARGET liblldb PROPERTY SOVERSION)
 
 if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
   if (NOT LLDB_EXPORT_ALL_SYMBOLS)
