@@ -164,10 +164,8 @@ if(lldb_lua_wrapper)
   set_source_files_properties(${lldb_lua_wrapper} PROPERTIES GENERATED ON)
 endif()
 
-set_target_properties(liblldb
-  PROPERTIES
-  VERSION ${LLDB_VERSION}
-)
+set_property(TARGET liblldb PROPERTY VERSION)
+set_property(TARGET liblldb PROPERTY SOVERSION)
 
 if (NOT CMAKE_SYSTEM_NAME MATCHES "Windows")
   if (NOT LLDB_EXPORT_ALL_SYMBOLS)
