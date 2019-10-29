@@ -1,6 +1,3 @@
-variables:
-  CMAKE_BUILD_TYPE: 'MinSizeRel'
-
 jobs:
 - job: Linux
   pool:
@@ -30,7 +27,7 @@ jobs:
   - script: |
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+         -DCMAKE_BUILD_TYPE=MinSizeRel
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
     displayName: 'Configure'
@@ -94,7 +91,7 @@ jobs:
   - script: |
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-          -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)\
+          -DCMAKE_BUILD_TYPE=MinSizeRel\
           -DCMAKE_SYSTEM_NAME=Linux\
           -DCMAKE_SYSTEM_PROCESSOR=aarch64
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
@@ -161,7 +158,7 @@ jobs:
   - script: |
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
     displayName: 'Configure'
@@ -173,6 +170,9 @@ jobs:
 
   - script: |
       cd $(Agent.BuildDirectory)/lldb
+      dsymutil bin/lldb -o bin/lldb.dSYM
+      dsymutil bin/lldb-argdumper -o bin/lldb-argdumper.dSYM
+      dsymutil lib/liblldb.dylib -o lib/liblldb.dSYM
       zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-apple-darwin.zip\
         bin/lldb\
         bin/lldb.dSYM\
@@ -236,7 +236,7 @@ jobs:
       set LIBRARY_PATH=C:\tools\msys64\usr\lib
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)^
-         -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE)
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
     displayName: 'Configure'
