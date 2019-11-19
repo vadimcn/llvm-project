@@ -103,6 +103,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
             -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
             -DCMAKE_CROSSCOMPILING=TRUE
             -DLLVM_TARGET_ARCH=aarch64
+            -DLLVM_HOST_TRIPLE=aarch64-unknown-linux-gnu
         )
     endif()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
