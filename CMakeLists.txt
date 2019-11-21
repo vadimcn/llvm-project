@@ -4,17 +4,9 @@ project(build-lldb)
 include(ExternalProject)
 include(FindPythonInterp)
 
-
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux" AND ${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-    set(CMakeTargetCompiler
-        -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc
-        -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
-    )
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    set(CMakeTargetCompiler 
-        -DCMAKE_C_COMPILER=cl
-        -DCMAKE_CXX_COMPILER=cl
-    )
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows" AND NOT CMAKE_TOOLCHAIN_FILE)
+    set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/toolchain-x86_64-windows-msvc.cmake)
+    include(${CMAKE_TOOLCHAIN_FILE})
 endif()
 
 ExternalProject_Add(swig
@@ -36,10 +28,8 @@ ExternalProject_Add(libxml2
     GIT_REPOSITORY https://github.com/robotology-dependencies/libxml2-cmake-buildsystem.git
     GIT_TAG master
     UPDATE_COMMAND ""
-    CMAKE_ARGS 
-        ${CMakeTargetCompiler}
-        -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
-        -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
+    CMAKE_ARGS
+        -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
         -DCMAKE_BUILD_TYPE=MinSizeRel
         $<$<NOT:$<PLATFORM_ID:Windows>>:-DCMAKE_C_FLAGS=-fPIC>
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/libxml2
@@ -95,15 +85,11 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(CMakeArgs ${CMakeArgs} 
         "-DCMAKE_CXX_FLAGS=-static-libstdc++ -static-libgcc"
     )
-    if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        string(REPLACE "x86_64" "aarch64" Python3_LIBRARIES ${Python3_LIBRARIES})
-        
+    if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
         set(CMakeArgs ${CMakeArgs} 
-            -DCMAKE_SYSTEM_NAME=${CMAKE_SYSTEM_NAME}
-            -DCMAKE_SYSTEM_PROCESSOR=${CMAKE_SYSTEM_PROCESSOR}
             -DCMAKE_CROSSCOMPILING=TRUE
-            -DLLVM_TARGET_ARCH=aarch64
-            -DLLVM_HOST_TRIPLE=aarch64-unknown-linux-gnu
+            -DLLVM_TARGET_ARCH=${CMAKE_SYSTEM_PROCESSOR}
+            -DLLVM_HOST_TRIPLE=${LLVM_TRIPLE}
         )
     endif()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
@@ -122,7 +108,7 @@ string(JOIN "$<SEMICOLON>" LLVM_ENABLE_PROJECTS ${LLVM_ENABLE_PROJECTS})
 string(JOIN "$<SEMICOLON>" LLVM_TARGETS_TO_BUILD ${LLVM_TARGETS_TO_BUILD})
 
 set(CMakeArgs ${CMakeArgs}
-    ${CMakeTargetCompiler}
+    -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
     -DLLVM_ENABLE_PROJECTS=${LLVM_ENABLE_PROJECTS}
     -DLLVM_TARGETS_TO_BUILD=${LLVM_TARGETS_TO_BUILD}
