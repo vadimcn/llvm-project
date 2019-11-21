@@ -5,70 +5,14 @@ jobs:
 
   container: 'vadimcn/linux-builder:latest'
 
-  timeoutInMinutes: 360
-
-  steps:
-  - script: |
-      cat /proc/cpuinfo
-      cat /proc/meminfo
-    displayName: 'Info'
-
-  - task: CacheBeta@0
-    inputs:
-      key: ccache | $(Agent.OS) | $(Build.BuildId)
-      restoreKeys: |
-        ccache | $(Agent.OS) | $(Build.SourceVersion)
-        ccache | $(Agent.OS) 
-      path: $(Agent.BuildDirectory)/.ccache
-      continueOnError: true
-    displayName: CCache
-    condition: always()
-
-  - script: |
-      git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-         -DCMAKE_BUILD_TYPE=MinSizeRel
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
-    displayName: 'Configure'
-    
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
-    displayName: 'Build'
-
-  - script: |
-      cd $(Agent.BuildDirectory)/lldb
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-unknown-linux-gnu.zip\
-        bin/lldb\
-        bin/lldb-argdumper\
-        bin/lldb-server\
-        lib/liblldb.*\
-        lib/python3*/site-packages
-    displayName: 'Zip'
-
-  - task: PublishBuildArtifacts@1
-    inputs:
-      artifactName: 'lldb--x86_64-unknown-linux-gnu'
- 
-  # - script: |
-  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
-  #   displayName: 'test'
-
-  - script: |
-      env
-      find $(Agent.BuildDirectory) -type d
-      cat $(Agent.BuildDirectory)/CMakeCache.txt
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
-    displayName: 'On Failure'
-    condition: failed()
-
-############################################################
-
-- job: Linux_aarch64
-  pool:
-    vmImage: 'Ubuntu 16.04'
-
-  container: 'vadimcn/linux-builder:latest'
+  strategy:
+    matrix:
+      x86_64:
+        Triple: 'x86_64-linux-gnu'      
+      arm:
+        Triple: 'arm-linux-gnueabihf'      
+      aarch64:
+        Triple: 'aarch64-linux-gnu'      
 
   timeoutInMinutes: 360
 
@@ -80,20 +24,20 @@ jobs:
 
   - task: CacheBeta@0
     inputs:
-      key: ccache | $(Agent.OS) | $(Build.SourceVersion)
+      key: ccache | $(Agent.OS) | $(Triple) | $(Build.BuildId)
       restoreKeys: |
-        ccache | $(Agent.OS) 
+        ccache | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
+        ccache | $(Agent.OS) | $(Triple)
       path: $(Agent.BuildDirectory)/.ccache
       continueOnError: true
     displayName: CCache
     condition: always()
-   
+
   - script: |
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-          -DCMAKE_BUILD_TYPE=MinSizeRel\
-          -DCMAKE_SYSTEM_NAME=Linux\
-          -DCMAKE_SYSTEM_PROCESSOR=aarch64
+        -DCMAKE_BUILD_TYPE=MinSizeRel\
+        -DCMAKE_TOOLCHAIN_FILE=toolchain-$(Triple).cmake
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
     displayName: 'Configure'
@@ -104,7 +48,7 @@ jobs:
 
   - script: |
       cd $(Agent.BuildDirectory)/lldb
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--aarch64-unknown-linux-gnu.zip\
+      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--$(Triple).zip\
         bin/lldb\
         bin/lldb-argdumper\
         bin/lldb-server\
@@ -114,11 +58,7 @@ jobs:
 
   - task: PublishBuildArtifacts@1
     inputs:
-      artifactName: 'lldb--aarch64-unknown-linux-gnu'
- 
-  # - script: |
-  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
-  #   displayName: 'test'
+      artifactName: 'lldb--$(Triple)'
 
   - script: |
       env
@@ -188,10 +128,6 @@ jobs:
     inputs:
       artifactName: 'lldb--x86_64-apple-darwin'
 
-  # - script: |
-  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
-  #   displayName: 'test'
-
   - script: |
       env
       find $(Agent.BuildDirectory) -type d
@@ -247,7 +183,7 @@ jobs:
 
   - script: |
       cd $(Agent.BuildDirectory)/lldb
-      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-pc-windows-msvc.zip^
+      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-windows-msvc.zip^
         bin/lldb.*^
         bin/lldb-argdumper.*^
         bin/liblldb.*^
@@ -257,11 +193,7 @@ jobs:
 
   - task: PublishBuildArtifacts@1
     inputs:
-      artifactName: 'lldb--x86_64-pc-windows-msvc'
-
-  # - script: |
-  #     cmake --build $(Agent.BuildDirectory)/build --target check-lldb
-  #   displayName: 'test'
+      artifactName: 'lldb--x86_64-windows-msvc'
 
   - script: |
       set
