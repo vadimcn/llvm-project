@@ -338,7 +338,7 @@ private:
 // would always return `true` and `PyGILState_Ensure/Release` flow would be
 // executed instead of unlocking GIL with `PyEval_SaveThread`. When
 // an another thread calls `PyGILState_Ensure` it would get stuck in deadlock.
-#if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 7) || (PY_MAJOR_VERSION > 3)
+#if (PY_MAJOR_VERSION == 3 && PY_MINOR_VERSION >= 7) || (PY_MAJOR_VERSION > 3) || Py_LIMITED_API
     // The only case we should go further and acquire the GIL: it is unlocked.
     if (PyGILState_Check())
       return;
