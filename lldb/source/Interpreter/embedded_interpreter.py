@@ -7,22 +7,7 @@ import code
 import lldb
 import traceback
 
-try:
-    import readline
-    import rlcompleter
-except ImportError:
-    have_readline = False
-except AttributeError:
-    # This exception gets hit by the rlcompleter when Linux is using
-    # the readline suppression import.
-    have_readline = False
-else:
-    have_readline = True
-    if 'libedit' in readline.__doc__:
-        readline.parse_and_bind('bind ^I rl_complete')
-    else:
-        readline.parse_and_bind('tab: complete')
-
+have_readline = False
 g_builtin_override_called = False
 
 
