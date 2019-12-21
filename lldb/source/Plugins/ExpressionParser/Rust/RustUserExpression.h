@@ -17,13 +17,16 @@
 namespace lldb_private {
 
 class RustUserExpression : public UserExpression {
+  /// LLVM RTTI support.
+  static char ID;
+
 public:
 
   RustUserExpression(ExecutionContextScope &exe_scope, llvm::StringRef expr,
                      llvm::StringRef prefix, lldb::LanguageType language,
                      ResultType desired_type,
                      const EvaluateExpressionOptions &options)
-    : UserExpression(exe_scope, expr, prefix, language, desired_type, options, eKindUserExpression)
+    : UserExpression(exe_scope, expr, prefix, language, desired_type, options)
   {
   }
 
