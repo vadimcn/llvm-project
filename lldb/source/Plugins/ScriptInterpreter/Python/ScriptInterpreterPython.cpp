@@ -211,39 +211,6 @@ LLDBSWIGPython_GetDynamicSetting(void *module, const char *setting,
 static LazyBool g_enabled = eLazyBoolCalculate;
 static bool g_initialized = false;
 
-#ifdef Py_LIMITED_API
-PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals)
-{
-  PyObject* code = Py_CompileString(str, "<string>", start);
-  if (!code)
-    return nullptr;
-  PyObject* result = PyEval_EvalCode(code, globals, locals);
-  Py_DECREF(code);
-  return result;
-}
-
-int PyRun_SimpleString(const char* str)
-{
-  PyObject *m, *d, *v;
-  m = PyImport_AddModule("__main__");
-  if (m == NULL)
-      return -1;
-  d = PyModule_GetDict(m);
-  v = PyRun_String(str, Py_file_input, d, d);
-  if (v == NULL) {
-      PyErr_Print();
-      return -1;
-  }
-  Py_DECREF(v);
-  return 0;
-}
-
-int PyGILState_Check() {
-  PyThreadState* tstate = PyThreadState_Get();
-  return tstate && tstate == PyGILState_GetThisThreadState();
-}
-#endif
-
 namespace {
 
 // Initializing Python is not a straightforward process.  We cannot control

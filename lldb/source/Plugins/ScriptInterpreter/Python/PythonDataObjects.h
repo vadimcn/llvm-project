@@ -60,6 +60,16 @@
 
 #include "llvm/ADT/ArrayRef.h"
 
+#ifdef Py_LIMITED_API
+#undef PyRun_String
+#undef PyRun_SimpleString
+PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals);
+int PyRun_SimpleString(const char* str);
+int PyGILState_Check();
+#define PyBUF_READ 0x100
+#define PyBUF_WRITE 0x200
+#endif
+
 namespace lldb_private {
 namespace python {
 
@@ -610,7 +620,6 @@ class PythonCallable : public TypedPythonObject<PythonCallable> {
 public:
   using TypedPythonObject::TypedPythonObject;
 
-#ifndef Py_LIMITED_API
   struct ArgInfo {
     /* the largest number of positional arguments this callable
      * can accept, or UNBOUNDED, ie UINT_MAX if it's a varargs
@@ -618,13 +627,11 @@ public:
     unsigned max_positional_args;
     static constexpr unsigned UNBOUNDED = UINT_MAX; // FIXME c++17 inline
   };
-#endif
 
   static bool Check(PyObject *py_obj);
 
-#ifndef Py_LIMITED_API  
   llvm::Expected<ArgInfo> GetArgInfo() const;
-#endif
+
   PythonObject operator()();
 
   PythonObject operator()(std::initializer_list<PyObject *> args);
