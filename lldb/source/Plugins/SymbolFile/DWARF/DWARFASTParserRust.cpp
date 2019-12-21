@@ -533,9 +533,11 @@ DWARFASTParserRust::ParseFields(const DWARFDIE &die, std::vector<size_t> &discri
 
     if (is_variant && child_die.Tag() == DW_TAG_variant) {
       // Find the discriminant, if it exists.
+      new_field.is_default = true;
       for (auto &&attr : IterableDIEAttrs(child_die)) {
         if (attr.first == DW_AT_discr_value) {
           new_field.discriminant = attr.second.Unsigned();
+          new_field.is_default = false;
           break;
         }
       }
