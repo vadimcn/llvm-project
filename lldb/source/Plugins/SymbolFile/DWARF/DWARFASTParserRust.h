@@ -39,7 +39,7 @@ public:
   }
 
   lldb::TypeSP ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
-                                  const DWARFDIE &die, lldb_private::Log *log,
+                                  const DWARFDIE &die,
                                   bool *type_is_new_ptr) override;
 
   lldb_private::Function *
@@ -57,8 +57,8 @@ public:
 
   lldb_private::CompilerDecl GetDeclForUIDFromDWARF(const DWARFDIE &die) override;
 
-  std::vector<DWARFDIE> GetDIEForDeclContext(lldb_private::CompilerDeclContext decl_context)
-    override;
+  void EnsureAllDIEsInDeclContextHaveBeenParsed(
+      lldb_private::CompilerDeclContext decl_context) override;
 
 private:
   lldb::TypeSP ParseSimpleType(lldb_private::Log *log, const DWARFDIE &die);

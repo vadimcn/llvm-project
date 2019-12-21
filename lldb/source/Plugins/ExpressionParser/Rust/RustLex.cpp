@@ -40,7 +40,7 @@ void lldb_private::rust::PrintTokenKind(Stream &stream, int kind) {
     case INVALID:
     case THATSALLFOLKS:
       // May want to clean this up someday.
-      stream << "[TOKEN=" << kind << "]";
+      stream.Format("[TOKEN={0:x}]", kind);
       break;
 
     case DOTDOT:
