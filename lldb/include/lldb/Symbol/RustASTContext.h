@@ -31,6 +31,9 @@ class RustDeclContext;
 class RustType;
 
 class RustASTContext : public TypeSystem {
+  // LLVM RTTI support
+  static char ID;
+
 public:
   RustASTContext();
   ~RustASTContext() override;
@@ -47,10 +50,6 @@ public:
   static lldb::TypeSystemSP CreateInstance(lldb::LanguageType language,
                                            Module *module, Target *target);
 
-  static void EnumerateSupportedLanguages(
-      std::set<lldb::LanguageType> &languages_for_types,
-      std::set<lldb::LanguageType> &languages_for_expressions);
-
   static void Initialize();
 
   static void Terminate();
@@ -62,9 +61,8 @@ public:
   //------------------------------------------------------------------
   // llvm casting support
   //------------------------------------------------------------------
-  static bool classof(const TypeSystem *ts) {
-    return ts->getKind() == TypeSystem::eKindRust;
-  }
+  bool isA(const void *ClassID) const override { return ClassID == &ID; }
+  static bool classof(const TypeSystem *ts) { return ts->isA(&ID); }
 
   //----------------------------------------------------------------------
   // CompilerDecl functions
@@ -72,7 +70,7 @@ public:
   ConstString DeclGetName(void *opaque_decl) override;
   ConstString DeclGetMangledName(void *opaque_decl) override;
   CompilerDeclContext DeclGetDeclContext(void *opaque_decl) override;
-
+  CompilerType GetTypeForDecl(void *opaque_decl) override;
 
   //----------------------------------------------------------------------
   // CompilerDeclContext functions
@@ -81,7 +79,6 @@ public:
   std::vector<CompilerDecl>
   DeclContextFindDeclByName(void *opaque_decl_ctx, ConstString name,
                             const bool ignore_imported_decls) override;
-  bool DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) override;
   ConstString DeclContextGetName(void *opaque_decl_ctx) override;
   ConstString DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) override;
   bool DeclContextIsClassMethod(void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
@@ -266,6 +263,8 @@ public:
   // Exploring the type
   //----------------------------------------------------------------------
 
+  const llvm::fltSemantics &GetFloatTypeSemantics(size_t byte_size) override;  
+
   llvm::Optional<uint64_t> GetBitSize(lldb::opaque_compiler_type_t type,
                            ExecutionContextScope *exe_scope) override;
 
@@ -381,12 +380,6 @@ public:
                    Stream *s, const DataExtractor &data,
                    lldb::offset_t data_offset, size_t data_byte_size) override;
 
-  // Converts "s" to a floating point value and place resulting floating
-  // point bytes in the "dst" buffer.
-  size_t ConvertStringToFloatValue(lldb::opaque_compiler_type_t type,
-                                   const char *s, uint8_t *dst,
-                                   size_t dst_size) override;
-
   bool IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
                                 CompilerType *pointee_type = nullptr) override;
 
@@ -395,7 +388,9 @@ public:
   bool IsCStringType(lldb::opaque_compiler_type_t type,
                      uint32_t &length) override;
 
-  size_t GetTypeBitAlign(lldb::opaque_compiler_type_t type) override;
+  virtual llvm::Optional<size_t>
+  GetTypeBitAlign(lldb::opaque_compiler_type_t type,
+                  ExecutionContextScope *exe_scope) override;
 
   CompilerType GetBasicTypeFromAST(lldb::BasicType basic_type) override;
 

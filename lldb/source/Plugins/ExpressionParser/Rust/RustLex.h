@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringMap.h"
 #include "lldb/Utility/Stream.h"
 
 namespace lldb_private {
