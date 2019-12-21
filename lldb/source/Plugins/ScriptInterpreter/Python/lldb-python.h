@@ -48,6 +48,11 @@
 #pragma weak PyBool_Type
 #pragma weak PyByteArray_Type
 #pragma weak PyCFunction_Type
+#pragma weak PyFloat_Type
+#pragma weak PyFunction_Type
+#pragma weak PyModule_Type
+#pragma weak PyType_Type
+#pragma weak PyExc_Exception
 #pragma weak PyExc_AttributeError
 #pragma weak PyExc_IndexError
 #pragma weak PyExc_IOError
@@ -61,9 +66,6 @@
 #pragma weak PyExc_TypeError
 #pragma weak PyExc_ValueError
 #pragma weak PyExc_ZeroDivisionError
-#pragma weak PyFloat_Type
-#pragma weak PyModule_Type
-#pragma weak PyType_Type
 
 #define Py_LIMITED_API 0x03050000
 

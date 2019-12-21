@@ -19,7 +19,6 @@
 #include "lldb/Interpreter/ScriptInterpreter.h"
 #include "lldb/Utility/Log.h"
 #include "lldb/Utility/Stream.h"
-#include "lldb/Utility/LLDBAssert.h"
 
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Casting.h"
@@ -840,7 +839,6 @@ def main(f):
 )";
 #endif
 
-#ifndef Py_LIMITED_API
 Expected<PythonCallable::ArgInfo> PythonCallable::GetArgInfo() const {
   ArgInfo result = {};
   if (!IsValid())
@@ -912,7 +910,6 @@ Expected<PythonCallable::ArgInfo> PythonCallable::GetArgInfo() const {
 
   return result;
 }
-#endif // Py_LIMITED_API
 
 constexpr unsigned
     PythonCallable::ArgInfo::UNBOUNDED; // FIXME delete after c++17
@@ -982,7 +979,7 @@ protected:
 const char *PythonException::toCString() const {
   if (!m_repr_bytes)
     return "unknown exception";
-  return PyBytes_AS_STRING(m_repr_bytes);
+  return PyBytes_AsString(m_repr_bytes);
 }
 
 PythonException::PythonException(const char *caller) {
@@ -1175,6 +1172,7 @@ char SimplePythonFile::ID = 0;
 
 #if PY_MAJOR_VERSION >= 3
 
+#ifndef Py_LIMITED_API
 namespace {
 class PythonBuffer {
 public:
@@ -1208,6 +1206,7 @@ private:
   Py_buffer m_buffer;
 };
 } // namespace
+#endif
 
 // Shared methods between TextPythonFile and BinaryPythonFile
 namespace {
@@ -1268,6 +1267,7 @@ public:
 
   Status Write(const void *buf, size_t &num_bytes) override {
     GIL takeGIL;
+
     PyObject *pybuffer_p = PyMemoryView_FromMemory(
         const_cast<char *>((const char *)buf), num_bytes, PyBUF_READ);
     if (!pybuffer_p)
@@ -1297,11 +1297,18 @@ public:
       num_bytes = 0;
       return Status();
     }
+#ifndef Py_LIMITED_API
     auto pybuffer = PythonBuffer::Create(pybuffer_obj.get());
     if (!pybuffer)
       return Status(pybuffer.takeError());
     memcpy(buf, pybuffer.get().get().buf, pybuffer.get().get().len);
     num_bytes = pybuffer.get().get().len;
+#else
+  const char* data;
+  if (!PyArg_Parse(pybuffer_obj.get().get(), "y#", &data, &num_bytes))
+    return Status(llvm::make_error<PythonException>());
+  memcpy(buf, data, num_bytes);
+#endif
     return Status();
   }
 };
@@ -1585,4 +1592,37 @@ python::runStringMultiLine(const llvm::Twine &string,
   return Take<PythonObject>(result);
 }
 
+#endif
+
+#ifdef Py_LIMITED_API
+PyObject* PyRun_String(const char *str, int start, PyObject *globals, PyObject *locals)
+{
+  PyObject* code = Py_CompileString(str, "<string>", start);
+  if (!code)
+    return nullptr;
+  PyObject* result = PyEval_EvalCode(code, globals, locals);
+  Py_DECREF(code);
+  return result;
+}
+
+int PyRun_SimpleString(const char* str)
+{
+  PyObject *m, *d, *v;
+  m = PyImport_AddModule("__main__");
+  if (m == NULL)
+      return -1;
+  d = PyModule_GetDict(m);
+  v = PyRun_String(str, Py_file_input, d, d);
+  if (v == NULL) {
+      PyErr_Print();
+      return -1;
+  }
+  Py_DECREF(v);
+  return 0;
+}
+
+int PyGILState_Check() {
+  PyThreadState* tstate = PyThreadState_Get();
+  return tstate && tstate == PyGILState_GetThisThreadState();
+}
 #endif
