@@ -918,9 +918,10 @@ private:
 } // namespace lldb_private
 using namespace lldb_private;
 
+char RustASTContext::ID;
+
 RustASTContext::RustASTContext()
-    : TypeSystem(eKindRust),
-      m_pointer_byte_size(0)
+    : m_pointer_byte_size(0)
 {
 }
 
@@ -965,25 +966,14 @@ lldb::TypeSystemSP RustASTContext::CreateInstance(lldb::LanguageType language,
   return lldb::TypeSystemSP();
 }
 
-void RustASTContext::EnumerateSupportedLanguages(
-    std::set<lldb::LanguageType> &languages_for_types,
-    std::set<lldb::LanguageType> &languages_for_expressions) {
-  static std::vector<lldb::LanguageType> s_supported_languages_for_types(
-      {lldb::eLanguageTypeRust});
-
-  static std::vector<lldb::LanguageType> s_supported_languages_for_expressions(
-      {});
-
-  languages_for_types.insert(s_supported_languages_for_types.begin(),
-                             s_supported_languages_for_types.end());
-  languages_for_expressions.insert(
-      s_supported_languages_for_expressions.begin(),
-      s_supported_languages_for_expressions.end());
-}
-
 void RustASTContext::Initialize() {
+  LanguageSet supported_languages_for_types;
+  supported_languages_for_types.Insert(lldb::eLanguageTypeRust);
+  LanguageSet supported_languages_for_expressions;
   PluginManager::RegisterPlugin(GetPluginNameStatic(), "Rust AST context plug-in",
-                                CreateInstance, EnumerateSupportedLanguages);
+                                CreateInstance, 
+                                supported_languages_for_types, 
+                                supported_languages_for_expressions);
 }
 
 void RustASTContext::Terminate() {
@@ -1402,6 +1392,21 @@ RustASTContext::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
 // Exploring the type
 //----------------------------------------------------------------------
 
+const llvm::fltSemantics &RustASTContext::GetFloatTypeSemantics(size_t byte_size) {
+  switch (byte_size) {
+    case 2:
+      return llvm::APFloatBase::IEEEhalf();
+    case 4:
+      return llvm::APFloatBase::IEEEsingle();
+    case 8: 
+      return llvm::APFloatBase::IEEEdouble();
+    case 16: 
+      return llvm::APFloatBase::IEEEquad();
+    default: 
+      return llvm::APFloatBase::Bogus();
+  }
+}
+
 llvm::Optional<uint64_t> RustASTContext::GetBitSize(lldb::opaque_compiler_type_t type,
                                                     ExecutionContextScope *exe_scope) {
   if (!type)
@@ -1437,8 +1442,9 @@ lldb::Format RustASTContext::GetFormat(lldb::opaque_compiler_type_t type) {
   return static_cast<RustType *>(type)->Format();
 }
 
-size_t RustASTContext::GetTypeBitAlign(lldb::opaque_compiler_type_t type) {
-  return 0;
+llvm::Optional<size_t> RustASTContext::GetTypeBitAlign(lldb::opaque_compiler_type_t type,
+                                                       ExecutionContextScope *exe_scope) {
+  return {};
 }
 
 uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
@@ -1634,16 +1640,6 @@ size_t RustASTContext::GetIndexOfChildMemberWithName(
     return 0;
   child_indexes.push_back(index);
   return 1;
-}
-
-// Converts "s" to a floating point value and place resulting floating
-// point bytes in the "dst" buffer.
-size_t
-RustASTContext::ConvertStringToFloatValue(lldb::opaque_compiler_type_t type,
-                                        const char *s, uint8_t *dst,
-                                        size_t dst_size) {
-  assert(false);
-  return 0;
 }
 
 //----------------------------------------------------------------------
@@ -2109,6 +2105,12 @@ CompilerDeclContext RustASTContext::DeclGetDeclContext(void *opaque_decl) {
   return CompilerDeclContext(this, dc->Context());
 }
 
+CompilerType RustASTContext::GetTypeForDecl(void *opaque_decl) {
+  Host::SystemLog(Host::eSystemLogError, "error: need to implement RustASTContext::GetTypeForDecl\n");
+  //RustDecl *dc = (RustDecl *) opaque_decl;
+  return CompilerType();
+}
+
 ConstString RustASTContext::DeclContextGetName(void *opaque_decl_ctx) {
   RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
   return dc->Name();
@@ -2117,13 +2119,6 @@ ConstString RustASTContext::DeclContextGetName(void *opaque_decl_ctx) {
 ConstString RustASTContext::DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) {
   RustDeclContext *dc = (RustDeclContext *) opaque_decl_ctx;
   return dc->QualifiedName();
-}
-
-bool RustASTContext::DeclContextIsStructUnionOrClass(void *opaque_decl_ctx) {
-  // This is not actually correct -- for example an enum arm is nested
-  // in its containing enum -- but as far as I can tell this result
-  // doesn't matter for Rust.
-  return false;
 }
 
 bool RustASTContext::DeclContextIsClassMethod(void *opaque_decl_ctx,

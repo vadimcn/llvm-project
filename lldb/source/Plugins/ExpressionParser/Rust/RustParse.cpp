@@ -55,11 +55,11 @@ GetASTContext(ValueObjectSP val, Status &error) {
 static RustASTContext *
 GetASTContext(ExecutionContext &ctxt, Status &error) {
   Target *target = ctxt.GetTargetPtr();
-  TypeSystem *sys = target->GetScratchTypeSystemForLanguage(&error, eLanguageTypeRust);
-  if (!sys) {
+  auto sys_or_err = target->GetScratchTypeSystemForLanguage(eLanguageTypeRust);
+  if (!sys_or_err) {
     return nullptr;
   }
-  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(sys);
+  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(&sys_or_err.get());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
@@ -69,7 +69,7 @@ GetASTContext(ExecutionContext &ctxt, Status &error) {
 static ValueObjectSP
 CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType type,
                       Status &error) {
-  DataExtractor data;
+  lldb_private::DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
     return ValueObjectSP();
@@ -103,7 +103,7 @@ CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error)
 static bool
 SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &error) {
   Scalar scalar(value);
-  DataExtractor data;
+  lldb_private::DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
     return false;
@@ -120,7 +120,7 @@ SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &
 static bool
 SetField(const ValueObjectSP &object, const char *name, const ValueObjectSP &value,
          Status &error) {
-  DataExtractor data;
+  lldb_private::DataExtractor data;
   if (!value->GetData(data, error)) {
     return false;
   }
@@ -143,9 +143,9 @@ GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
 
   TypeList type_list;
   llvm::DenseSet<SymbolFile *> searched_symbol_files;
-  uint32_t num_matches = target->GetImages().FindTypes(nullptr, ConstString(name), true,
-                                                       2, searched_symbol_files, type_list);
-  if (num_matches > 0) {
+  target->GetImages().FindTypes(nullptr, ConstString(name), true,
+                                2, searched_symbol_files, type_list);
+  if (!type_list.Empty()) {
     return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
   }
   error.SetErrorStringWithFormat("could not find type \"%s\"", name);
@@ -508,11 +508,11 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
   const ModuleList &module_list = target->GetImages();
   module_list.ForEach(
     [&](const ModuleSP &mod) {
-      TypeSystem *ts = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
-      if (!ts) {
+      auto ts_or_err = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
+      if (!ts_or_err) {
         return true;
       }
-      SymbolFile *symbol_file = ts->GetSymbolFile();
+      SymbolFile *symbol_file = ts_or_err->GetSymbolFile();
       if (!symbol_file) {
         return true;
       }
@@ -529,8 +529,7 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
         mod->FindGlobalVariables(cs_name, &found_ns, 1, var_list);
 
         SymbolContextList context_list;
-        mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false, false,
-                           true, context_list);
+        mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false, false, context_list);
         for (size_t i = 0; i < context_list.GetSize(); ++i) {
           SymbolContext sym_context;
           if (context_list.GetContextAtIndex(i, sym_context) && sym_context.function) {
@@ -1327,7 +1326,7 @@ RustExpressionUP Parser::Unary(Status &error) {
   if (!result) {
     return result;
   }
-  return llvm::make_unique<RustUnaryExpression<C, OP>>(std::move(result));
+  return std::make_unique<RustUnaryExpression<C, OP>>(std::move(result));
 }
 
 bool Parser::ExprList(std::vector<RustExpressionUP> *exprs, Status &error) {
@@ -1356,7 +1355,7 @@ RustExpressionUP Parser::Parens(Status &error) {
   if (CurrentToken().kind == ')') {
     // Unit tuple.
     Advance();
-    return llvm::make_unique<RustTupleExpression>(std::vector<RustExpressionUP>());
+    return std::make_unique<RustTupleExpression>(std::vector<RustExpressionUP>());
   }
 
   RustExpressionUP expr = Expr(error);
@@ -1389,7 +1388,7 @@ RustExpressionUP Parser::Parens(Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustTupleExpression>(std::move(exprs));
+  return std::make_unique<RustTupleExpression>(std::move(exprs));
 }
 
 RustExpressionUP Parser::Array(Status &error) {
@@ -1415,14 +1414,14 @@ RustExpressionUP Parser::Array(Status &error) {
       return length;
     }
 
-    result = llvm::make_unique<RustArrayWithLength>(std::move(expr), std::move(length));
+    result = std::make_unique<RustArrayWithLength>(std::move(expr), std::move(length));
   } else if (CurrentToken().kind == ',') {
     Advance();
     std::vector<RustExpressionUP> exprs;
     exprs.push_back(std::move(expr));
 
     if (ExprList(&exprs, error)) {
-      result = llvm::make_unique<RustArrayLiteral>(std::move(exprs));
+      result = std::make_unique<RustArrayLiteral>(std::move(exprs));
     }
   } else {
     error.SetErrorString("expected ',' or ';'");
@@ -1445,12 +1444,12 @@ RustExpressionUP Parser::Field(RustExpressionUP &&lhs, Status &error) {
 
   RustExpressionUP result;
   if (CurrentToken().kind == IDENTIFIER) {
-    result = llvm::make_unique<RustFieldExpression>(std::move(lhs),
+    result = std::make_unique<RustFieldExpression>(std::move(lhs),
                                                     CurrentToken().str);
     Advance();
   } else if (CurrentToken().kind == INTEGER) {
-    result = llvm::make_unique<RustTupleFieldExpression>(std::move(lhs),
-                                                         CurrentToken().uinteger.getValue());
+    result = std::make_unique<RustTupleFieldExpression>(std::move(lhs),
+                                                        CurrentToken().uinteger.getValue());
     Advance();
   } else {
     error.SetErrorString("identifier or integer expected");
@@ -1476,7 +1475,7 @@ RustExpressionUP Parser::Call(RustExpressionUP &&func, Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustCall>(std::move(func), std::move(exprs));
+  return std::make_unique<RustCall>(std::move(func), std::move(exprs));
 }
 
 RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
@@ -1494,7 +1493,7 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustBinaryExpression<'@', ArrayIndex>>(std::move(array),
+  return std::make_unique<RustBinaryExpression<'@', ArrayIndex>>(std::move(array),
                                                                   std::move(idx));
 }
 
@@ -1513,7 +1512,7 @@ RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
       if (CurrentToken().kind == ',' || CurrentToken().kind == '}') {
         // Plain "field".
         std::string field_copy = field;
-        value = llvm::make_unique<RustPathExpression>(std::move(field_copy));
+        value = std::make_unique<RustPathExpression>(std::move(field_copy));
       } else if (CurrentToken().kind != ':') {
         error.SetErrorString("':' expected");
         return RustExpressionUP();
@@ -1555,8 +1554,8 @@ RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustStructExpression>(std::move(path), std::move(inits),
-                                                 std::move(copy));
+  return std::make_unique<RustStructExpression>(std::move(path), std::move(inits),
+                                                std::move(copy));
 }
 
 RustExpressionUP Parser::Path(Status &error) {
@@ -1569,7 +1568,7 @@ RustExpressionUP Parser::Path(Status &error) {
     if (CurrentToken().kind != COLONCOLON) {
       // This one can't be a struct expression, so we just return
       // directly.
-      return llvm::make_unique<RustPathExpression>(std::string("self"));
+      return std::make_unique<RustPathExpression>(std::string("self"));
     }
   }
 
@@ -1619,17 +1618,17 @@ RustExpressionUP Parser::Path(Status &error) {
   }
 
   if (CurrentToken().kind == '{') {
-    RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers,
-                                                       std::move(path), std::move(type_list),
-                                                       true);
+    RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers,
+                                                      std::move(path), std::move(type_list),
+                                                      true);
     RustTypeExpressionUP type_path =
-      llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
+      std::make_unique<RustPathTypeExpression>(std::move(name_path));
     return Struct(std::move(type_path), error);
   }
 
-  RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers,
+  RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers,
                                                      std::move(path), std::move(type_list));
-  return llvm::make_unique<RustPathExpression>(std::move(name_path));
+  return std::make_unique<RustPathExpression>(std::move(name_path));
 }
 
 RustExpressionUP Parser::Sizeof(Status &error) {
@@ -1653,7 +1652,7 @@ RustExpressionUP Parser::Sizeof(Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustUnaryExpression<'@', UnarySizeof>>(std::move(expr));
+  return std::make_unique<RustUnaryExpression<'@', UnarySizeof>>(std::move(expr));
 }
 
 bool Parser::StartsTerm() {
@@ -1698,8 +1697,8 @@ RustExpressionUP Parser::Term(Status &error) {
     if (!suffix) {
       suffix = "i32";
     }
-    RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);
-    term = llvm::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), std::move(type));
+    RustTypeExpressionUP type = std::make_unique<RustPathTypeExpression>(suffix);
+    term = std::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), std::move(type));
     Advance();
     break;
   }
@@ -1709,29 +1708,29 @@ RustExpressionUP Parser::Term(Status &error) {
     if (!suffix) {
       suffix = "f64";
     }
-    RustTypeExpressionUP type = llvm::make_unique<RustPathTypeExpression>(suffix);
-    term = llvm::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), std::move(type));
+    RustTypeExpressionUP type = std::make_unique<RustPathTypeExpression>(suffix);
+    term = std::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), std::move(type));
     Advance();
     break;
   }
 
   case STRING:
   case BYTESTRING:
-    term = llvm::make_unique<RustStringLiteral>(std::move(CurrentToken().str),
+    term = std::make_unique<RustStringLiteral>(std::move(CurrentToken().str),
                                                 CurrentToken().kind == BYTESTRING);
     Advance();
     break;
 
   case CHAR:
   case BYTE:
-    term = llvm::make_unique<RustCharLiteral>(CurrentToken().uinteger.getValue(),
+    term = std::make_unique<RustCharLiteral>(CurrentToken().uinteger.getValue(),
                                               CurrentToken().kind == BYTE);
     Advance();
     break;
 
   case TRUE:
   case FALSE:
-    term = llvm::make_unique<RustBooleanLiteral>(CurrentToken().kind == TRUE);
+    term = std::make_unique<RustBooleanLiteral>(CurrentToken().kind == TRUE);
     Advance();
     break;
 
@@ -1799,7 +1798,7 @@ RustExpressionUP Parser::Term(Status &error) {
       if (!type) {
         return RustExpressionUP();
       }
-      term = llvm::make_unique<RustCast>(std::move(type), std::move(term));
+      term = std::make_unique<RustCast>(std::move(type), std::move(term));
       break;
     }
 
@@ -1951,7 +1950,7 @@ RustExpressionUP Parser::Binary(Status &error) {
       switch (top.op) {
 #define DEFINE(Token, Prec, Type)                                       \
         case Token:                                                     \
-          lhs.term = llvm::make_unique<Type>(std::move(lhs.term), std::move(top.term)); \
+          lhs.term = std::make_unique<Type>(std::move(lhs.term), std::move(top.term)); \
           break;
 
         BINARY_OPERATORS
@@ -1997,7 +1996,7 @@ RustExpressionUP Parser::Range(Status &error) {
     }
   }
 
-  return llvm::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs), is_inclusive);
+  return std::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs), is_inclusive);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -2032,7 +2031,7 @@ RustTypeExpressionUP Parser::ArrayType(Status &error) {
   }
   Advance();
 
-  return llvm::make_unique<RustArrayTypeExpression>(std::move(element), len);
+  return std::make_unique<RustArrayTypeExpression>(std::move(element), len);
 }
 
 RustTypeExpressionUP Parser::ReferenceType(Status &error) {
@@ -2063,10 +2062,10 @@ RustTypeExpressionUP Parser::ReferenceType(Status &error) {
     }
     Advance();
 
-    return llvm::make_unique<RustSliceTypeExpression>(std::move(target), is_mut);
+    return std::make_unique<RustSliceTypeExpression>(std::move(target), is_mut);
   }
 
-  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), true, is_mut);
+  return std::make_unique<RustPointerTypeExpression>(std::move(target), true, is_mut);
 }
 
 RustTypeExpressionUP Parser::PointerType(Status &error) {
@@ -2087,7 +2086,7 @@ RustTypeExpressionUP Parser::PointerType(Status &error) {
     return target;
   }
 
-  return llvm::make_unique<RustPointerTypeExpression>(std::move(target), false, is_mut);
+  return std::make_unique<RustPointerTypeExpression>(std::move(target), false, is_mut);
 }
 
 bool Parser::TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
@@ -2173,8 +2172,8 @@ RustTypeExpressionUP Parser::FunctionType(Status &error) {
     return return_type;
   }
 
-  return llvm::make_unique<RustFunctionTypeExpression>(std::move(return_type),
-                                                       std::move(type_list));
+  return std::make_unique<RustFunctionTypeExpression>(std::move(return_type),
+                                                      std::move(type_list));
 }
 
 RustTypeExpressionUP Parser::TupleType(Status &error) {
@@ -2187,7 +2186,7 @@ RustTypeExpressionUP Parser::TupleType(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  return llvm::make_unique<RustTupleTypeExpression>(std::move(type_list));
+  return std::make_unique<RustTupleTypeExpression>(std::move(type_list));
 }
 
 RustTypeExpressionUP Parser::TypePath(Status &error) {
@@ -2248,9 +2247,9 @@ RustTypeExpressionUP Parser::TypePath(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  RustPathUP name_path = llvm::make_unique<RustPath>(saw_self, relative, supers, std::move(path),
-                                                     std::move(type_list));
-  return llvm::make_unique<RustPathTypeExpression>(std::move(name_path));
+  RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers, std::move(path),
+                                                    std::move(type_list));
+  return std::make_unique<RustPathTypeExpression>(std::move(name_path));
 }
 
 RustTypeExpressionUP Parser::Type(Status &error) {

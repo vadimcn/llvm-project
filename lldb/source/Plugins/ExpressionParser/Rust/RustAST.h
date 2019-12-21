@@ -389,7 +389,8 @@ public:
 private:
 
   void print(Stream &stream) override {
-    stream << m_left << "." << int(m_field);
+    stream << m_left;
+    stream.Format(".{}", m_field);
   }
 
   RustExpressionUP m_left;
@@ -613,7 +614,7 @@ public:
     std::vector<std::string> names;
     names.push_back(std::move(item));
 
-    m_path = llvm::make_unique<RustPath>(false, true, 0, std::move(names),
+    m_path = std::make_unique<RustPath>(false, true, 0, std::move(names),
                                          std::vector<RustTypeExpressionUP>());
   }
 
@@ -694,8 +695,8 @@ public:
     std::vector<std::string> names;
     names.push_back(std::move(item));
 
-    m_path = llvm::make_unique<RustPath>(false, true, 0, std::move(names),
-                                         std::vector<RustTypeExpressionUP>());
+    m_path = std::make_unique<RustPath>(false, true, 0, std::move(names),
+                                        std::vector<RustTypeExpressionUP>());
   }
 
   void print(Stream &stream) override {
@@ -721,7 +722,8 @@ public:
   }
 
   void print(Stream &stream) override {
-    stream << "[" << m_element << "; " << int64_t(m_len) << "]";
+    stream << "[" << m_element;
+    stream.Format("; {}]", m_len);
   }
 
   CompilerType Evaluate(ExecutionContext &exe_ctx, Status &error) override;
