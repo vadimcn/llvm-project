@@ -53,7 +53,7 @@ jobs:
         bin/lldb-argdumper\
         bin/lldb-server\
         lib/liblldb.*\
-        lib/python3*/site-packages
+        lib/python3*/*-packages
     displayName: 'Zip'
 
   - task: PublishBuildArtifacts@1
@@ -121,7 +121,7 @@ jobs:
         bin/debugserver\
         lib/liblldb.*\
         lib/liblldb.*.dSYM\
-        lib/python3*/site-packages
+        lib/python3*/*-packages
     displayName: 'Zip'
 
   - task: PublishBuildArtifacts@1
@@ -188,7 +188,7 @@ jobs:
         bin/lldb-argdumper.*^
         bin/liblldb.*^
         lib/liblldb.*^
-        lib/site-packages
+        lib/*-packages
     displayName: 'Zip'
 
   - task: PublishBuildArtifacts@1
