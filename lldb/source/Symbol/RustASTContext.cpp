@@ -1241,15 +1241,36 @@ lldb::TypeClass RustASTContext::GetTypeClass(lldb::opaque_compiler_type_t type) 
 
 lldb::BasicType
 RustASTContext::GetBasicTypeEnumeration(lldb::opaque_compiler_type_t type) {
-  ConstString name = GetTypeName(type);
-  if (name.IsEmpty()) {
-    // Nothing.
-  } else if (strcmp(name.AsCString(), "()") == 0) {
-    return eBasicTypeVoid;
-  } else if (strcmp(name.AsCString(), "bool") == 0) {
+  if (!type)
+    return eBasicTypeInvalid;
+
+  auto rsType = static_cast<RustType *>(type);
+  if (rsType->AsBool()) {
     return eBasicTypeBool;
+  } else if (rsType->IsFloatType()) {
+    if (rsType->ByteSize() == 4) {
+      return eBasicTypeFloat;
+    } else if (rsType->ByteSize() == 8) {
+      return eBasicTypeDouble;
+    }
+  } else if (rsType->IsCharType()) {
+    return eBasicTypeChar32;
+  } else if (auto rsInt = rsType->AsInteger()) {
+    if (rsInt->ByteSize() == 1) {
+      return rsInt->IsSigned() ? eBasicTypeSignedChar : eBasicTypeUnsignedChar;
+    } else if (rsInt->ByteSize() == 2) {
+      return rsInt->IsSigned() ? eBasicTypeShort : eBasicTypeUnsignedShort;
+    } else if (rsInt->ByteSize() == 4) {
+      return rsInt->IsSigned() ? eBasicTypeInt : eBasicTypeUnsignedInt;
+    } else if (rsInt->ByteSize() == 8) {
+      return rsInt->IsSigned() ? eBasicTypeLongLong : eBasicTypeUnsignedLongLong;
+    } else if (rsInt->ByteSize() == 16) {
+      return rsInt->IsSigned() ? eBasicTypeInt128 : eBasicTypeUnsignedInt128;
+    }
+  } else if (rsType->ByteSize() == 0 && rsType->Name() == "()") {
+    return eBasicTypeVoid;
   }
-  return eBasicTypeInvalid;
+  return eBasicTypeOther;
 }
 
 lldb::LanguageType
