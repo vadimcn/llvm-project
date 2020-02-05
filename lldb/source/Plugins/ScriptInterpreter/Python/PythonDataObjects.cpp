@@ -866,7 +866,7 @@ def main(f):
                       Parameter.VAR_KEYWORD):
             pass
         else:
-            raise Exception(f'unknown parameter kind: {kind}')
+            raise Exception('unknown parameter kind: ' + kind)
     return ArgInfo(count, varargs)
 )";
 #endif
