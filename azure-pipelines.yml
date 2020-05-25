@@ -52,6 +52,9 @@ jobs:
         bin/lldb\
         bin/lldb-argdumper\
         bin/lldb-server\
+        bin/llvm-dwarfdump\
+        bin/llvm-pdbutil\
+        bin/llvm-readobj\
         lib/liblldb.*\
         lib/python3*/*-packages
     displayName: 'Zip'
@@ -119,6 +122,9 @@ jobs:
         bin/lldb-argdumper\
         bin/lldb-argdumper.dSYM\
         bin/debugserver\
+        bin/llvm-dwarfdump\
+        bin/llvm-pdbutil\
+        bin/llvm-readobj\
         lib/liblldb.*\
         lib/liblldb.*.dSYM\
         lib/python3*/*-packages
@@ -187,6 +193,9 @@ jobs:
         bin/lldb.*^
         bin/lldb-argdumper.*^
         bin/liblldb.*^
+        bin/llvm-dwarfdump.*^
+        bin/llvm-pdbutil.*^
+        bin/llvm-readobj.*^
         lib/liblldb.*^
         lib/*-packages
     displayName: 'Zip'
