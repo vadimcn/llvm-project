@@ -77,7 +77,7 @@ set(LLVM_TARGETS_TO_BUILD X86 AArch64 ARM)
 set(LIBXML2_INCLUDE_DIR ${CMAKE_BINARY_DIR}/libxml2/include/libxml2)
 set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/libxml2.a)
 set(SWIG_EXECUTABLE ${CMAKE_BINARY_DIR}/swig/swig)
-set(BuildTargets lldb)
+set(BuildTargets lldb llvm-dwarfdump llvm-pdbutil llvm-readobj)
 
 find_package (Python3 COMPONENTS Interpreter Development)
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
