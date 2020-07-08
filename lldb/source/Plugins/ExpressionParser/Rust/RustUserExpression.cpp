@@ -1,4 +1,4 @@
-//===-- RustUserExpression.cpp ------------------------------------*- C++ -*-===//
+//===-- RustUserExpression.cpp ----------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -8,12 +8,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustUserExpression.h"
+#include "Plugins/ExpressionParser/Rust/RustParse.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Expression/ExpressionVariable.h"
 #include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Target/Target.h"
-#include "Plugins/ExpressionParser/Rust/RustParse.h"
 
 using namespace lldb_private::rust;
 using namespace lldb_private;
@@ -22,8 +22,8 @@ using namespace lldb;
 bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
                                ExecutionContext &exe_ctx,
                                lldb_private::ExecutionPolicy execution_policy,
-                               bool keep_result_in_memory, bool generate_debug_info)
-{
+                               bool keep_result_in_memory,
+                               bool generate_debug_info) {
   InstallContext(exe_ctx);
 
   Parser parser(exe_ctx.GetTargetSP(), m_expr_text);
@@ -37,12 +37,12 @@ bool RustUserExpression::Parse(DiagnosticManager &diagnostic_manager,
   return true;
 }
 
-lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
-                                                      ExecutionContext &exe_ctx,
-                                                      const EvaluateExpressionOptions &options,
-                                                      lldb::UserExpressionSP &shared_ptr_to_me,
-                                                      lldb::ExpressionVariableSP &result)
-{
+lldb::ExpressionResults
+RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
+                              ExecutionContext &exe_ctx,
+                              const EvaluateExpressionOptions &options,
+                              lldb::UserExpressionSP &shared_ptr_to_me,
+                              lldb::ExpressionVariableSP &result) {
   Status error;
   ValueObjectSP value = m_expr->Evaluate(exe_ctx, error);
   m_expr.reset();
@@ -59,8 +59,8 @@ lldb::ExpressionResults RustUserExpression::DoExecute(DiagnosticManager &diagnos
   PersistentExpressionState *pv =
       target->GetPersistentExpressionStateForLanguage(eLanguageTypeRust);
   if (pv != nullptr) {
-    result->SetName(pv->GetNextPersistentVariableName(*target,
-                                                      pv->GetPersistentVariablePrefix()));
+    result->SetName(pv->GetNextPersistentVariableName(
+        *target, pv->GetPersistentVariablePrefix()));
     pv->AddVariable(result);
   }
 

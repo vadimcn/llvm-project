@@ -1,4 +1,4 @@
-//===-- RustLex.h -------------------------------------------------*- C++ -*-===//
+//===-- RustLex.h -----------------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -15,10 +15,10 @@
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private.h"
 
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringMap.h"
 #include "lldb/Utility/Stream.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace lldb_private {
 
@@ -80,36 +80,19 @@ struct Token {
   const char *number_suffix = nullptr;
   std::string str;
 
-  explicit Token(int kind_)
-    : kind(kind_)
-  {
-  }
+  explicit Token(int kind_) : kind(kind_) {}
 
   Token(int kind_, uint64_t val_, const char *suffix_ = nullptr)
-    : kind(kind_),
-      uinteger(val_),
-      number_suffix(suffix_)
-  {
-  }
+      : kind(kind_), uinteger(val_), number_suffix(suffix_) {}
 
   Token(int kind_, double val_, const char *suffix_ = nullptr)
-    : kind(kind_),
-      dvalue(val_),
-      number_suffix(suffix_)
-  {
-  }
+      : kind(kind_), dvalue(val_), number_suffix(suffix_) {}
 
-  Token(int kind_, std::string &&str_)
-    : kind(kind_),
-      str(std::move(str_))
-  {
-  }
+  Token(int kind_, std::string &&str_) : kind(kind_), str(std::move(str_)) {}
 
   bool operator==(const Token &other) const {
-    if (kind != other.kind ||
-        uinteger != other.uinteger ||
-        dvalue != other.dvalue ||
-        str != other.str) {
+    if (kind != other.kind || uinteger != other.uinteger ||
+        dvalue != other.dvalue || str != other.str) {
       return false;
     }
 
@@ -126,17 +109,11 @@ struct Token {
 
 class Lexer {
 public:
-
-  explicit Lexer(llvm::StringRef ref)
-    : m_iter(ref.begin()),
-      m_end(ref.end())
-  {
-  }
+  explicit Lexer(llvm::StringRef ref) : m_iter(ref.begin()), m_end(ref.end()) {}
 
   Token Next();
 
 private:
-
   const char *CheckSuffix(const char *const *suffixes);
   bool BasicInteger(int *radix_out, std::string *value);
   Token MaybeByteLiteral();
