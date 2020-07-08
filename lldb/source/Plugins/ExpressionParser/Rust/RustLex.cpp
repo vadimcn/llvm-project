@@ -5,11 +5,11 @@
 // This file is distributed under the University of Illinois Open Source
 // License. See LICENSE.TXT for details.
 //
-//===----------------------------------------------------------------------===//
+//===-------------------------------------------------------------===//
 
 #include "RustLex.h"
-#include "llvm/Support/ConvertUTF.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/Support/ConvertUTF.h"
 
 using namespace lldb_private::rust;
 using namespace lldb_private;
@@ -199,8 +199,8 @@ Token Lexer::Operator() {
 bool Lexer::BasicInteger(int *radix_out, std::string *value) {
   int radix = 10;
 
-  assert (m_iter != m_end);
-  assert (*m_iter >= '0' && *m_iter <= '9');
+  assert(m_iter != m_end);
+  assert(*m_iter >= '0' && *m_iter <= '9');
 
   bool need_digit = false;
   if (radix_out != nullptr && *m_iter == '0') {
@@ -280,7 +280,8 @@ const char *Lexer::CheckSuffix(const char *const *suffixes) {
 }
 
 int Lexer::Float(std::string *value) {
-  assert(m_iter != m_end && (*m_iter == '.' || *m_iter == 'e' || *m_iter == 'E'));
+  assert(m_iter != m_end &&
+         (*m_iter == '.' || *m_iter == 'e' || *m_iter == 'E'));
 
   if (*m_iter == '.') {
     ++m_iter;
@@ -339,11 +340,7 @@ Token Lexer::Number() {
         return Token(INVALID);
       }
 
-      static const char * const float_suffixes[] = {
-        "f32",
-        "f64",
-        nullptr
-      };
+      static const char *const float_suffixes[] = {"f32", "f64", nullptr};
 
       const char *suffix = CheckSuffix(float_suffixes);
 
@@ -354,19 +351,9 @@ Token Lexer::Number() {
     assert(kind == INTEGER);
   }
 
-  static const char * const int_suffixes[] = {
-    "u8",
-    "i8",
-    "u16",
-    "i16",
-    "u32",
-    "i32",
-    "u64",
-    "i64",
-    "usize",
-    "isize",
-    nullptr
-  };
+  static const char *const int_suffixes[] = {"u8",    "i8",    "u16",  "i16",
+                                             "u32",   "i32",   "u64",  "i64",
+                                             "usize", "isize", nullptr};
 
   APInt value;
   ::llvm::StringRef sref(number);
@@ -395,8 +382,8 @@ Token Lexer::Identifier() {
 
   for (++m_iter; m_iter != m_end; ++m_iter) {
     char c = *m_iter;
-    if (! ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' ||
-           (c >= '0' && c <= '9'))) {
+    if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' ||
+          (c >= '0' && c <= '9'))) {
       break;
     }
   }
@@ -568,9 +555,8 @@ Token Lexer::MaybeRawString(bool is_byte) {
 
   for (; iter != m_end; ++iter) {
     if (*iter == '"' &&
-        (n_hashes == 0 ||
-         (size_t(m_end - iter + 1) > n_hashes &&
-          strncmp(iter + 1, before_hashes, n_hashes) == 0))) {
+        (n_hashes == 0 || (size_t(m_end - iter + 1) > n_hashes &&
+                           strncmp(iter + 1, before_hashes, n_hashes) == 0))) {
       break;
     }
   }

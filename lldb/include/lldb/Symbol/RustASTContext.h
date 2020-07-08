@@ -1,4 +1,4 @@
-//===-- RustASTContext.h ------------------------------------------*- C++ -*-===//
+//===-- RustASTContext.h ----------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -81,7 +81,8 @@ public:
                             const bool ignore_imported_decls) override;
   ConstString DeclContextGetName(void *opaque_decl_ctx) override;
   ConstString DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) override;
-  bool DeclContextIsClassMethod(void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
+  bool DeclContextIsClassMethod(void *opaque_decl_ctx,
+                                lldb::LanguageType *language_ptr,
                                 bool *is_instance_method_ptr,
                                 ConstString *language_object_name_ptr) override;
   bool DeclContextIsContainedInLookup(void *opaque_decl_ctx,
@@ -109,10 +110,11 @@ public:
 
   CompilerType CreateTypedefType(const ConstString &name, CompilerType impl);
 
-  CompilerType CreateFunctionType(const lldb_private::ConstString &name,
-                                  const CompilerType &return_type,
-                                  const std::vector<CompilerType> &&params,
-                                  const std::vector<CompilerType> &&template_params);
+  CompilerType
+  CreateFunctionType(const lldb_private::ConstString &name,
+                     const CompilerType &return_type,
+                     const std::vector<CompilerType> &&params,
+                     const std::vector<CompilerType> &&template_params);
 
   CompilerType CreateStructType(const ConstString &name, uint32_t byte_size,
                                 bool has_discriminant);
@@ -128,18 +130,20 @@ public:
 
   void AddFieldToStruct(const CompilerType &struct_type,
                         const ConstString &name, const CompilerType &field_type,
-                        uint32_t byte_offset,
-                        bool is_default, uint64_t discriminant);
+                        uint32_t byte_offset, bool is_default,
+                        uint64_t discriminant);
   void FinishAggregateInitialization(const CompilerType &type);
 
-  void AddTemplateParameter(const CompilerType &type, const CompilerType &param);
+  void AddTemplateParameter(const CompilerType &type,
+                            const CompilerType &param);
 
   bool TypeHasDiscriminant(const CompilerType &type);
   bool IsTupleType(const CompilerType &type);
 
   // Return true and set the out params if the type is a Rust enum;
   // return false otherwise.
-  bool GetEnumDiscriminantLocation(const CompilerType &type, uint64_t &discr_offset,
+  bool GetEnumDiscriminantLocation(const CompilerType &type,
+                                   uint64_t &discr_offset,
                                    uint64_t &discr_byte_size);
 
   // Given an actual discriminant value, find the correct enum variant
@@ -263,10 +267,11 @@ public:
   // Exploring the type
   //----------------------------------------------------------------------
 
-  const llvm::fltSemantics &GetFloatTypeSemantics(size_t byte_size) override;  
+  const llvm::fltSemantics &GetFloatTypeSemantics(size_t byte_size) override;
 
-  llvm::Optional<uint64_t> GetBitSize(lldb::opaque_compiler_type_t type,
-                           ExecutionContextScope *exe_scope) override;
+  llvm::Optional<uint64_t>
+  GetBitSize(lldb::opaque_compiler_type_t type,
+             ExecutionContextScope *exe_scope) override;
 
   lldb::Encoding GetEncoding(lldb::opaque_compiler_type_t type,
                              uint64_t &count) override;
@@ -337,13 +342,15 @@ public:
                                 const char *name, bool omit_empty_base_classes,
                                 std::vector<uint32_t> &child_indexes) override;
 
-  lldb::TemplateArgumentKind GetTemplateArgumentKind(lldb::opaque_compiler_type_t type,
-                                                     size_t idx) override {
+  lldb::TemplateArgumentKind
+  GetTemplateArgumentKind(lldb::opaque_compiler_type_t type,
+                          size_t idx) override {
     // Rust currently only has types.
     return lldb::eTemplateArgumentKindType;
   }
 
-  CompilerType GetTypeTemplateArgument(lldb::opaque_compiler_type_t type, size_t idx) override;
+  CompilerType GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
+                                       size_t idx) override;
   size_t GetNumTemplateArguments(lldb::opaque_compiler_type_t type) override;
 
   //----------------------------------------------------------------------
@@ -421,7 +428,8 @@ public:
                        bool *is_rvalue = nullptr) override;
 
   CompilerDeclContext GetTranslationUnitDecl();
-  CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent, const ConstString &name);
+  CompilerDeclContext GetNamespaceDecl(CompilerDeclContext parent,
+                                       const ConstString &name);
   CompilerDeclContext GetDeclContextDeclContext(CompilerDeclContext child);
   CompilerDecl GetDecl(CompilerDeclContext parent, const ConstString &name,
                        const ConstString &mangled);
@@ -466,15 +474,15 @@ private:
 class RustASTContextForExpr : public RustASTContext {
 public:
   RustASTContextForExpr(lldb::TargetSP target) : m_target_wp(target) {}
-  UserExpression *
-  GetUserExpression(llvm::StringRef expr, llvm::StringRef prefix,
-                    lldb::LanguageType language,
-                    Expression::ResultType desired_type,
-                    const EvaluateExpressionOptions &options,
-                    ValueObject *ctx_obj) override;
+  UserExpression *GetUserExpression(llvm::StringRef expr,
+                                    llvm::StringRef prefix,
+                                    lldb::LanguageType language,
+                                    Expression::ResultType desired_type,
+                                    const EvaluateExpressionOptions &options,
+                                    ValueObject *ctx_obj) override;
 
 private:
   lldb::TargetWP m_target_wp;
 };
-}
+} // namespace lldb_private
 #endif // liblldb_RustASTContext_h_

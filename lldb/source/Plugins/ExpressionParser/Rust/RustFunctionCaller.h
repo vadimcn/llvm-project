@@ -10,13 +10,13 @@
 #ifndef liblldb_RustFunctionCaller_h_
 #define liblldb_RustFunctionCaller_h_
 
+#include "Plugins/ExpressionParser/Clang/ClangFunctionCaller.h"
 #include "lldb/Core/Address.h"
 #include "lldb/Core/Value.h"
 #include "lldb/Core/ValueObjectList.h"
 #include "lldb/Expression/FunctionCaller.h"
 #include "lldb/Symbol/CompilerType.h"
 #include "lldb/Target/Process.h"
-#include "Plugins/ExpressionParser/Clang/ClangFunctionCaller.h"
 
 namespace lldb_private {
 
@@ -27,9 +27,9 @@ class RustFunctionCaller : public ClangFunctionCaller {
 public:
   RustFunctionCaller(ExecutionContextScope &exe_scope,
                      const CompilerType &function_type,
-                      const CompilerType &return_type,
-                      const Address &function_address,
-                      const ValueList &arg_value_list, const char *name);
+                     const CompilerType &return_type,
+                     const Address &function_address,
+                     const ValueList &arg_value_list, const char *name);
 
   ~RustFunctionCaller() override;
 
@@ -37,7 +37,6 @@ public:
                            DiagnosticManager &diagnostic_manager) override;
 
 private:
-
   CompilerType m_function_type;
 };
 

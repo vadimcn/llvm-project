@@ -1,4 +1,4 @@
-//===-- RustParse.h -------------------------------------------------*- C++ -*-===//
+//===-- RustParse.h ---------------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -10,10 +10,10 @@
 #ifndef liblldb_RustParse_h
 #define liblldb_RustParse_h
 
+#include "RustAST.h"
+#include "RustLex.h"
 #include "lldb/lldb-forward.h"
 #include "lldb/lldb-private.h"
-#include "RustLex.h"
-#include "RustAST.h"
 
 namespace lldb_private {
 
@@ -21,14 +21,10 @@ namespace rust {
 
 class Parser {
 public:
-
   Parser(lldb::TargetSP target, llvm::StringRef ref)
-    : m_target(target),
-      m_lexer(ref),
-      // fixme this seems not good
-      m_current(m_lexer.Next())
-  {
-  }
+      : m_target(target), m_lexer(ref),
+        // fixme this seems not good
+        m_current(m_lexer.Next()) {}
 
   RustExpressionUP ParseFully(Status &error) {
     RustExpressionUP result = Expr(error);
@@ -40,9 +36,8 @@ public:
   }
 
 private:
-
   bool StartsTerm();
-  template<char C, RustUnaryOperator OP> RustExpressionUP Unary(Status &error);
+  template <char C, RustUnaryOperator OP> RustExpressionUP Unary(Status &error);
   bool ExprList(std::vector<RustExpressionUP> *exprs, Status &error);
   RustExpressionUP Parens(Status &error);
   RustExpressionUP Path(Status &error);
@@ -56,18 +51,17 @@ private:
   RustExpressionUP Struct(RustTypeExpressionUP &&path, Status &error);
   RustExpressionUP Range(Status &error);
 
-  RustExpressionUP Expr(Status &error) {
-    return Range(error);
-  }
-
+  RustExpressionUP Expr(Status &error) { return Range(error); }
 
   RustTypeExpressionUP Type(Status &error);
   RustTypeExpressionUP ArrayType(Status &error);
   RustTypeExpressionUP ReferenceType(Status &error);
   RustTypeExpressionUP PointerType(Status &error);
   bool TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
-  bool ParenTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
-  bool BracketTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error);
+  bool ParenTypeList(std::vector<RustTypeExpressionUP> *type_list,
+                     Status &error);
+  bool BracketTypeList(std::vector<RustTypeExpressionUP> *type_list,
+                       Status &error);
   RustTypeExpressionUP FunctionType(Status &error);
   RustTypeExpressionUP TupleType(Status &error);
   RustTypeExpressionUP TypePath(Status &error);
