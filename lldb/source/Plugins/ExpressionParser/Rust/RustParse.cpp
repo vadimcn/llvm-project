@@ -1,4 +1,4 @@
-//===-- RustParse.cpp ------------------------------------*- C++ -*-===//
+//===-- RustParse.cpp -------------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -30,59 +30,55 @@ using namespace lldb_private;
 using namespace lldb;
 using namespace llvm;
 
-static std::set<std::string> primitive_type_names
-  {
-   "bool", "char",
-   "u8", "u16", "u32", "u64", "u128",
-   "i8", "i16", "i32", "i64", "i128",
-   "f32", "f64"
-  };
+static std::set<std::string> primitive_type_names{
+    "bool", "char", "u8",  "u16", "u32",  "u64", "u128",
+    "i8",   "i16",  "i32", "i64", "i128", "f32", "f64"};
 
-static RustASTContext *
-GetASTContext(CompilerType type, Status &error) {
-  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+static RustASTContext *GetASTContext(CompilerType type, Status &error) {
+  RustASTContext *result =
+      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
 }
 
-static RustASTContext *
-GetASTContext(ValueObjectSP val, Status &error) {
+static RustASTContext *GetASTContext(ValueObjectSP val, Status &error) {
   return GetASTContext(val->GetCompilerType(), error);
 }
 
-static RustASTContext *
-GetASTContext(ExecutionContext &ctxt, Status &error) {
+static RustASTContext *GetASTContext(ExecutionContext &ctxt, Status &error) {
   Target *target = ctxt.GetTargetPtr();
   auto sys_or_err = target->GetScratchTypeSystemForLanguage(eLanguageTypeRust);
   if (!sys_or_err) {
     return nullptr;
   }
-  RustASTContext *result = llvm::dyn_cast_or_null<RustASTContext>(&sys_or_err.get());
+  RustASTContext *result =
+      llvm::dyn_cast_or_null<RustASTContext>(&sys_or_err.get());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
 }
 
-static ValueObjectSP
-CreateValueFromScalar(ExecutionContext &exe_ctx, Scalar &scalar, CompilerType type,
-                      Status &error) {
+static ValueObjectSP CreateValueFromScalar(ExecutionContext &exe_ctx,
+                                           Scalar &scalar, CompilerType type,
+                                           Status &error) {
   lldb_private::DataExtractor data;
   if (!scalar.GetData(data)) {
     error.SetErrorString("could not get data from scalar");
     return ValueObjectSP();
   }
-  ValueObjectSP result = ValueObject::CreateValueObjectFromData("", data, exe_ctx, type);
+  ValueObjectSP result =
+      ValueObject::CreateValueObjectFromData("", data, exe_ctx, type);
   if (!result) {
     error.SetErrorString("could not create value object");
   }
   return result;
 }
 
-static ValueObjectSP
-CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error) {
+static ValueObjectSP CreateValueInMemory(ExecutionContext &exe_ctx,
+                                         CompilerType type, Status &error) {
   if (!exe_ctx.HasProcessScope()) {
     error.SetErrorString("need a running inferior to evaluate this");
     return ValueObjectSP();
@@ -90,9 +86,8 @@ CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error)
 
   Process *proc = exe_ctx.GetProcessPtr();
   uint64_t size = type.GetByteSize(proc).getValueOr(0);
-  addr_t addr = proc->AllocateMemory(size,
-                                     lldb::ePermissionsWritable | lldb::ePermissionsReadable,
-                                     error);
+  addr_t addr = proc->AllocateMemory(
+      size, lldb::ePermissionsWritable | lldb::ePermissionsReadable, error);
   if (addr == LLDB_INVALID_ADDRESS) {
     return ValueObjectSP();
   }
@@ -100,8 +95,8 @@ CreateValueInMemory(ExecutionContext &exe_ctx, CompilerType type, Status &error)
   return ValueObject::CreateValueObjectFromAddress("", addr, exe_ctx, type);
 }
 
-static bool
-SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &error) {
+static bool SetField(const ValueObjectSP &object, const char *name,
+                     uint64_t value, Status &error) {
   Scalar scalar(value);
   lldb_private::DataExtractor data;
   if (!scalar.GetData(data)) {
@@ -117,9 +112,8 @@ SetField(const ValueObjectSP &object, const char *name, uint64_t value, Status &
   return child->SetData(data, error);
 }
 
-static bool
-SetField(const ValueObjectSP &object, const char *name, const ValueObjectSP &value,
-         Status &error) {
+static bool SetField(const ValueObjectSP &object, const char *name,
+                     const ValueObjectSP &value, Status &error) {
   lldb_private::DataExtractor data;
   if (!value->GetData(data, error)) {
     return false;
@@ -133,8 +127,8 @@ SetField(const ValueObjectSP &object, const char *name, const ValueObjectSP &val
   return child->SetData(data, error);
 }
 
-static CompilerType
-GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
+static CompilerType GetTypeByName(ExecutionContext &exe_ctx, const char *name,
+                                  Status &error) {
   Target *target = exe_ctx.GetTargetPtr();
   if (!target) {
     error.SetErrorString("could not get target to look up type");
@@ -143,8 +137,8 @@ GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
 
   TypeList type_list;
   llvm::DenseSet<SymbolFile *> searched_symbol_files;
-  target->GetImages().FindTypes(nullptr, ConstString(name), true,
-                                2, searched_symbol_files, type_list);
+  target->GetImages().FindTypes(nullptr, ConstString(name), true, 2,
+                                searched_symbol_files, type_list);
   if (!type_list.Empty()) {
     return type_list.GetTypeAtIndex(0)->GetFullCompilerType();
   }
@@ -152,18 +146,19 @@ GetTypeByName(ExecutionContext &exe_ctx, const char *name, Status &error) {
   return CompilerType();
 }
 
-ValueObjectSP
-lldb_private::rust::UnaryDereference(ExecutionContext &exe_ctx, ValueObjectSP addr, Status &error) {
+ValueObjectSP lldb_private::rust::UnaryDereference(ExecutionContext &exe_ctx,
+                                                   ValueObjectSP addr,
+                                                   Status &error) {
   return addr->Dereference(error);
 }
 
-ValueObjectSP
-lldb_private::rust::UnaryAddr(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
+ValueObjectSP lldb_private::rust::UnaryAddr(ExecutionContext &exe_ctx,
+                                            ValueObjectSP val, Status &error) {
   return val->AddressOf(error);
 }
 
-ValueObjectSP
-lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
+ValueObjectSP lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx,
+                                            ValueObjectSP val, Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (type.IsScalarType() && !ast->IsBooleanType(type.GetOpaqueQualType())) {
@@ -174,8 +169,9 @@ lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx, ValueObjectSP val, Stat
   return ValueObjectSP();
 }
 
-ValueObjectSP
-lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
+ValueObjectSP lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx,
+                                              ValueObjectSP val,
+                                              Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (!type.IsScalarType() || ast->IsBooleanType(type.GetOpaqueQualType())) {
@@ -198,8 +194,9 @@ lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx, ValueObjectSP val, St
   return ValueObjectSP();
 }
 
-ValueObjectSP
-lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
+ValueObjectSP lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx,
+                                                  ValueObjectSP val,
+                                                  Status &error) {
   RustASTContext *ast = GetASTContext(val, error);
   if (!ast) {
     return ValueObjectSP();
@@ -227,27 +224,31 @@ lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx, ValueObjectSP val
   return CreateValueFromScalar(exe_ctx, scalar, type, error);
 }
 
-ValueObjectSP
-lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx, ValueObjectSP val, Status &error) {
+ValueObjectSP lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx,
+                                              ValueObjectSP val,
+                                              Status &error) {
   if (RustASTContext *ast = GetASTContext(val, error)) {
     uint32_t ptr_size = ast->GetPointerByteSize();
-    CompilerType type = ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
-    Scalar size (val->GetByteSize());
+    CompilerType type =
+        ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
+    Scalar size(val->GetByteSize());
     return CreateValueFromScalar(exe_ctx, size, type, error);
   }
   return ValueObjectSP();
 }
 
-template<typename T, bool ASSIGN>
-ValueObjectSP
-lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                     lldb::ValueObjectSP right, Status &error) {
+template <typename T, bool ASSIGN>
+ValueObjectSP lldb_private::rust::BinaryOperation(ExecutionContext &exe_ctx,
+                                                  lldb::ValueObjectSP left,
+                                                  lldb::ValueObjectSP right,
+                                                  Status &error) {
   RustASTContext *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
   }
 
-  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
+  if (!left->GetCompilerType().IsScalarType() ||
+      !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
@@ -297,7 +298,8 @@ lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjec
     return ValueObjectSP();
   }
 
-  ValueObjectSP result_obj = CreateValueFromScalar(exe_ctx, result, type, error);
+  ValueObjectSP result_obj =
+      CreateValueFromScalar(exe_ctx, result, type, error);
 
   if (ASSIGN) {
     DataExtractor data;
@@ -316,16 +318,18 @@ lldb_private::rust::BinaryOperation (ExecutionContext &exe_ctx, lldb::ValueObjec
   return result_obj;
 }
 
-template<typename T>
-ValueObjectSP
-lldb_private::rust::Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                lldb::ValueObjectSP right, Status &error) {
+template <typename T>
+ValueObjectSP lldb_private::rust::Comparison(ExecutionContext &exe_ctx,
+                                             lldb::ValueObjectSP left,
+                                             lldb::ValueObjectSP right,
+                                             Status &error) {
   RustASTContext *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
   }
 
-  if (!left->GetCompilerType().IsScalarType() || !right->GetCompilerType().IsScalarType()) {
+  if (!left->GetCompilerType().IsScalarType() ||
+      !right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
@@ -343,9 +347,10 @@ lldb_private::rust::Comparison (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
   return CreateValueFromScalar(exe_ctx, value, type, error);
 }
 
-ValueObjectSP
-lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP left,
-                                lldb::ValueObjectSP right, Status &error) {
+ValueObjectSP lldb_private::rust::ArrayIndex(ExecutionContext &exe_ctx,
+                                             lldb::ValueObjectSP left,
+                                             lldb::ValueObjectSP right,
+                                             Status &error) {
   if (!right->GetCompilerType().IsScalarType()) {
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
@@ -372,8 +377,8 @@ lldb_private::rust::ArrayIndex (ExecutionContext &exe_ctx, lldb::ValueObjectSP l
   return result;
 }
 
-CompilerDeclContext
-RustPath::FrameDeclContext(ExecutionContext &exe_ctx, Status &error) {
+CompilerDeclContext RustPath::FrameDeclContext(ExecutionContext &exe_ctx,
+                                               Status &error) {
   StackFrame *frame = exe_ctx.GetFramePtr();
   if (frame == nullptr) {
     // FIXME?
@@ -395,9 +400,8 @@ RustPath::FrameDeclContext(ExecutionContext &exe_ctx, Status &error) {
   return CompilerDeclContext();
 }
 
-bool
-RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
-                         CompilerDeclContext *result, bool *simple_name) {
+bool RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
+                              CompilerDeclContext *result, bool *simple_name) {
   *simple_name = true;
 
   RustASTContext *ast = GetASTContext(exe_ctx, error);
@@ -431,8 +435,8 @@ RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
   return true;
 }
 
-bool
-RustPath::AppendGenerics(ExecutionContext &exe_ctx, Status &error, std::string *name) {
+bool RustPath::AppendGenerics(ExecutionContext &exe_ctx, Status &error,
+                              std::string *name) {
   if (!m_generic_params.empty()) {
     *name += "<";
     bool first = true;
@@ -452,11 +456,10 @@ RustPath::AppendGenerics(ExecutionContext &exe_ctx, Status &error, std::string *
   return true;
 }
 
-bool
-RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
-                   lldb::VariableSP *var,
-                   lldb_private::Function **function,
-                   std::string *base_name) {
+bool RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
+                        lldb::VariableSP *var,
+                        lldb_private::Function **function,
+                        std::string *base_name) {
   bool simple_name;
   CompilerDeclContext decl_ctx;
   if (!GetDeclContext(exe_ctx, error, &decl_ctx, &simple_name)) {
@@ -506,41 +509,42 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
   *function = nullptr;
   ConstString cs_name(name.c_str());
   const ModuleList &module_list = target->GetImages();
-  module_list.ForEach(
-    [&](const ModuleSP &mod) {
-      auto ts_or_err = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
-      if (!ts_or_err) {
-        return true;
-      }
-      SymbolFile *symbol_file = ts_or_err->GetSymbolFile();
-      if (!symbol_file) {
-        return true;
-      }
+  module_list.ForEach([&](const ModuleSP &mod) {
+    auto ts_or_err = mod->GetTypeSystemForLanguage(eLanguageTypeRust);
+    if (!ts_or_err) {
+      return true;
+    }
+    SymbolFile *symbol_file = ts_or_err->GetSymbolFile();
+    if (!symbol_file) {
+      return true;
+    }
 
-      CompilerDeclContext found_ns;
-      for (const ConstString &ns_name : fullname) {
-        found_ns = symbol_file->FindNamespace(ns_name, &found_ns);
-        if (!found_ns) {
+    CompilerDeclContext found_ns;
+    for (const ConstString &ns_name : fullname) {
+      found_ns = symbol_file->FindNamespace(ns_name, &found_ns);
+      if (!found_ns) {
+        break;
+      }
+    }
+
+    if (found_ns) {
+      mod->FindGlobalVariables(cs_name, &found_ns, 1, var_list);
+
+      SymbolContextList context_list;
+      mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false,
+                         false, context_list);
+      for (size_t i = 0; i < context_list.GetSize(); ++i) {
+        SymbolContext sym_context;
+        if (context_list.GetContextAtIndex(i, sym_context) &&
+            sym_context.function) {
+          *function = sym_context.function;
           break;
         }
       }
+    }
 
-      if (found_ns) {
-        mod->FindGlobalVariables(cs_name, &found_ns, 1, var_list);
-
-        SymbolContextList context_list;
-        mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false, false, context_list);
-        for (size_t i = 0; i < context_list.GetSize(); ++i) {
-          SymbolContext sym_context;
-          if (context_list.GetContextAtIndex(i, sym_context) && sym_context.function) {
-            *function = sym_context.function;
-            break;
-          }
-        }
-      }
-
-      return var_list.GetSize() == 0 && *function == nullptr;
-    });
+    return var_list.GetSize() == 0 && *function == nullptr;
+  });
 
   if (var_list.GetSize() != 0) {
     *var = var_list.GetVariableAtIndex(0);
@@ -548,7 +552,8 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
     // Ok.
   } else {
     if (base_name->empty()) {
-      error.SetErrorStringWithFormat("could not find decl \"%s\"", name.c_str());
+      error.SetErrorStringWithFormat("could not find decl \"%s\"",
+                                     name.c_str());
     }
     return false;
   }
@@ -556,8 +561,8 @@ RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
   return true;
 }
 
-CompilerType
-RustPath::EvaluateAsType(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustPath::EvaluateAsType(ExecutionContext &exe_ctx,
+                                      Status &error) {
   std::string fullname = Name(exe_ctx, error);
   if (error.Fail()) {
     return CompilerType();
@@ -565,8 +570,7 @@ RustPath::EvaluateAsType(ExecutionContext &exe_ctx, Status &error) {
   return GetTypeByName(exe_ctx, fullname.c_str(), error);
 }
 
-std::string
-RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
+std::string RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
   std::string name;
 
   CompilerDeclContext decl_ctx;
@@ -604,8 +608,8 @@ RustPath::Name(ExecutionContext &exe_ctx, Status &error) {
   return name;
 }
 
-lldb::ValueObjectSP
-RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustLiteral::Evaluate(ExecutionContext &exe_ctx,
+                                          Status &error) {
   CompilerType type = m_type->Evaluate(exe_ctx, error);
   if (!type) {
     return ValueObjectSP();
@@ -613,8 +617,8 @@ RustLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return CreateValueFromScalar(exe_ctx, m_value, type, error);
 }
 
-lldb::ValueObjectSP
-RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx,
+                                                 Status &error) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
@@ -625,8 +629,8 @@ RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return CreateValueFromScalar(exe_ctx, val, type, error);
 }
 
-lldb::ValueObjectSP
-RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustCharLiteral::Evaluate(ExecutionContext &exe_ctx,
+                                              Status &error) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
@@ -642,8 +646,8 @@ RustCharLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return CreateValueFromScalar(exe_ctx, val, type, error);
 }
 
-lldb::ValueObjectSP
-RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustStringLiteral::Evaluate(ExecutionContext &exe_ctx,
+                                                Status &error) {
   RustASTContext *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
@@ -689,8 +693,8 @@ RustStringLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return str_val;
 }
 
-lldb::ValueObjectSP
-RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustPathExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                 Status &error) {
   Target *target = exe_ctx.GetTargetPtr();
   if (!target) {
     error.SetErrorString("could not get target to look up item");
@@ -715,10 +719,12 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   if (!name.empty()) {
     VariableListSP frame_vars = frame->GetInScopeVariableList(false);
     if (frame_vars) {
-      if (VariableSP var = frame_vars->FindVariable(ConstString(name.c_str()))) {
+      if (VariableSP var =
+              frame_vars->FindVariable(ConstString(name.c_str()))) {
         // FIXME dynamic?  should come from the options, which we aren't
         // passing in.
-        return frame->GetValueObjectForFrameVariable(var, eDynamicDontRunTarget);
+        return frame->GetValueObjectForFrameVariable(var,
+                                                     eDynamicDontRunTarget);
       }
     }
   }
@@ -739,8 +745,8 @@ RustPathExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return ValueObjectSP();
 }
 
-lldb::ValueObjectSP
-RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                   Status &error) {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
   if (!vleft) {
     return vleft;
@@ -774,8 +780,8 @@ RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return vright;
 }
 
-lldb::ValueObjectSP
-RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                 Status &error) {
   ValueObjectSP vleft = m_left->Evaluate(exe_ctx, error);
   if (!vleft) {
     return vleft;
@@ -809,8 +815,8 @@ RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return vright;
 }
 
-lldb::ValueObjectSP
-RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustFieldExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                  Status &error) {
   ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
   if (!left) {
     return left;
@@ -823,7 +829,8 @@ RustFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     left = dynamic;
   }
 
-  ValueObjectSP result = left->GetChildMemberWithName(ConstString(m_field.c_str()), true);
+  ValueObjectSP result =
+      left->GetChildMemberWithName(ConstString(m_field.c_str()), true);
   if (!result) {
     error.SetErrorStringWithFormat("no field named %s", m_field.c_str());
   }
@@ -851,8 +858,8 @@ RustTupleFieldExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return result;
 }
 
-lldb::ValueObjectSP
-RustAssignment::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustAssignment::Evaluate(ExecutionContext &exe_ctx,
+                                             Status &error) {
   ValueObjectSP left = m_left->Evaluate(exe_ctx, error);
   if (!left) {
     return left;
@@ -876,20 +883,20 @@ RustAssignment::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return left;
 }
 
-lldb::ValueObjectSP
-RustTupleExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustTupleExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                  Status &error) {
   error.SetErrorString("tuple expressions unimplemented");
   return ValueObjectSP();
 }
 
-lldb::ValueObjectSP
-RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustArrayLiteral::Evaluate(ExecutionContext &exe_ctx,
+                                               Status &error) {
   error.SetErrorString("array literals unimplemented");
   return ValueObjectSP();
 }
 
-lldb::ValueObjectSP
-RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx,
+                                                  Status &error) {
   ValueObjectSP value = m_value->Evaluate(exe_ctx, error);
   if (!value) {
     return value;
@@ -908,7 +915,8 @@ RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   if (!ast) {
     return ValueObjectSP();
   }
-  CompilerType type = ast->CreateArrayType(value->GetCompilerType(), slength.UInt());
+  CompilerType type =
+      ast->CreateArrayType(value->GetCompilerType(), slength.UInt());
   if (!type) {
     error.SetErrorString("could not create array type");
     return ValueObjectSP();
@@ -928,15 +936,16 @@ RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     }
   }
 
-  ValueObjectSP result = ValueObject::CreateValueObjectFromData("", array_contents, exe_ctx, type);
+  ValueObjectSP result =
+      ValueObject::CreateValueObjectFromData("", array_contents, exe_ctx, type);
   if (!result) {
     error.SetErrorString("could not create array value object");
   }
   return result;
 }
 
-lldb::ValueObjectSP
-RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx,
+                                                   Status &error) {
   RustPathExpression *path_expr = m_func->AsPath();
   if (!path_expr) {
     return ValueObjectSP();
@@ -988,7 +997,8 @@ RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx, Status &error) {
 
     ValueObjectSP child = result->GetChildAtIndex(i, true);
     if (!child) {
-      error.SetErrorStringWithFormat("could not find child at index \"%d\"", int(i));
+      error.SetErrorStringWithFormat("could not find child at index \"%d\"",
+                                     int(i));
       return ValueObjectSP();
     }
     if (!child->SetData(data, error)) {
@@ -999,8 +1009,8 @@ RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx, Status &error) {
   return result;
 }
 
-lldb::ValueObjectSP
-RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustCall::Evaluate(ExecutionContext &exe_ctx,
+                                       Status &error) {
   error.Clear();
   ValueObjectSP result = MaybeEvalTupleStruct(exe_ctx, error);
   if (result) {
@@ -1059,12 +1069,12 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   // FIXME must cast each argument to the correct type here.
 
   // FIXME might be nice to stick the name in there.
-  RustFunctionCaller call(*exe_ctx.GetBestExecutionContextScope(), function_type,
-                          return_type, func_addr, args, nullptr);
+  RustFunctionCaller call(*exe_ctx.GetBestExecutionContextScope(),
+                          function_type, return_type, func_addr, args, nullptr);
   DiagnosticManager diags;
   Value results;
-  ExpressionResults ef_result =
-    call.ExecuteFunction(exe_ctx, nullptr, EvaluateExpressionOptions(), diags, results);
+  ExpressionResults ef_result = call.ExecuteFunction(
+      exe_ctx, nullptr, EvaluateExpressionOptions(), diags, results);
 
   if (ef_result != eExpressionCompleted) {
     // FIXME use the diagnostics.
@@ -1078,15 +1088,16 @@ RustCall::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     return ValueObjectSP();
   }
 
-  result = ValueObject::CreateValueObjectFromData("", data, exe_ctx, return_type);
+  result =
+      ValueObject::CreateValueObjectFromData("", data, exe_ctx, return_type);
   if (!result) {
     error.SetErrorString("could not create function return value object");
   }
   return result;
 }
 
-lldb::ValueObjectSP
-RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustCast::Evaluate(ExecutionContext &exe_ctx,
+                                       Status &error) {
   CompilerType type = m_type->Evaluate(exe_ctx, error);
   if (!type) {
     return ValueObjectSP();
@@ -1100,8 +1111,8 @@ RustCast::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return value->Cast(type);
 }
 
-lldb::ValueObjectSP
-RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustStructExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                   Status &error) {
   CompilerType type = m_path->Evaluate(exe_ctx, error);
   if (!type) {
     return ValueObjectSP();
@@ -1112,8 +1123,7 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
   // FIXME could tighten this to really ensure it is a struct and not
   // an enum.
-  if (!type.IsAggregateType() ||
-      type.IsArrayType(nullptr, nullptr, nullptr) ||
+  if (!type.IsAggregateType() || type.IsArrayType(nullptr, nullptr, nullptr) ||
       context->IsTupleType(type)) {
     error.SetErrorStringWithFormat("type \"%s\" is not a structure type",
                                    type.GetDisplayTypeName().AsCString());
@@ -1161,8 +1171,8 @@ RustStructExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return result;
 }
 
-lldb::ValueObjectSP
-RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+lldb::ValueObjectSP RustRangeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                  Status &error) {
   ValueObjectSP left, right;
 
   if (m_left) {
@@ -1182,7 +1192,8 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   CompilerType element_type;
   if (left) {
     if (right) {
-      name = m_inclusive ? "::core::ops::range::RangeInclusive" : "::core::ops::range::Range";
+      name = m_inclusive ? "::core::ops::range::RangeInclusive"
+                         : "::core::ops::range::Range";
       // FIXME this check seems wrong
       if (left->GetCompilerType() != right->GetCompilerType()) {
         // FIXME also we could be friendlier about integer promotion
@@ -1195,7 +1206,8 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
     }
     element_type = left->GetCompilerType();
   } else if (right) {
-    name = m_inclusive ? "::core::ops::range::RangeToInclusive" : "::core::ops::range::RangeTo";
+    name = m_inclusive ? "::core::ops::range::RangeToInclusive"
+                       : "::core::ops::range::RangeTo";
     element_type = right->GetCompilerType();
   } else {
     name = "::core::ops::range::RangeFull";
@@ -1229,8 +1241,8 @@ RustRangeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 ////////////////////////////////////////////////////////////////
 // Types
 
-CompilerType
-RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                               Status &error) {
   RustASTContext *context = GetASTContext(exe_ctx, error);
   if (!context) {
     return CompilerType();
@@ -1244,8 +1256,8 @@ RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return context->CreateArrayType(element, m_len);
 }
 
-CompilerType
-RustPointerTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustPointerTypeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                 Status &error) {
   CompilerType target = m_target->Evaluate(exe_ctx, error);
   if (!target) {
     return target;
@@ -1254,14 +1266,14 @@ RustPointerTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   return target.GetPointerType();
 }
 
-CompilerType
-RustSliceTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustSliceTypeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                               Status &error) {
   error.SetErrorString("slice type lookup unimplemented");
   return CompilerType();
 }
 
-CompilerType
-RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                                  Status &error) {
   RustASTContext *context = GetASTContext(exe_ctx, error);
   if (!context) {
     return CompilerType();
@@ -1282,11 +1294,12 @@ RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
   }
 
   std::vector<CompilerType> empty;
-  return context->CreateFunctionType(ConstString(""), ret, std::move(args), std::move(empty));
+  return context->CreateFunctionType(ConstString(""), ret, std::move(args),
+                                     std::move(empty));
 }
 
-CompilerType
-RustTupleTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
+CompilerType RustTupleTypeExpression::Evaluate(ExecutionContext &exe_ctx,
+                                               Status &error) {
   error.SetErrorString("tuple type lookup unimplemented");
   return CompilerType();
 }
@@ -1294,32 +1307,33 @@ RustTupleTypeExpression::Evaluate(ExecutionContext &exe_ctx, Status &error) {
 ////////////////////////////////////////////////////////////////
 // Output
 
-Stream &lldb_private::operator<< (Stream &stream, const RustExpressionUP &expr) {
+Stream &lldb_private::operator<<(Stream &stream, const RustExpressionUP &expr) {
   if (expr) {
     expr->print(stream);
   }
   return stream;
 }
 
-Stream &lldb_private::operator<< (Stream &stream, const RustTypeExpressionUP &type) {
+Stream &lldb_private::operator<<(Stream &stream,
+                                 const RustTypeExpressionUP &type) {
   type->print(stream);
   return stream;
 }
 
-Stream &lldb_private::operator<< (Stream &stream, const Scalar &value) {
+Stream &lldb_private::operator<<(Stream &stream, const Scalar &value) {
   value.GetValue(&stream, false);
   return stream;
 }
 
-Stream &lldb_private::operator<< (Stream &stream,
-                                  const std::pair<std::string, RustExpressionUP> &value) {
+Stream &lldb_private::operator<<(
+    Stream &stream, const std::pair<std::string, RustExpressionUP> &value) {
   return stream << value.first << ": " << value.second;
 }
 
 ////////////////////////////////////////////////////////////////
 // The parser
 
-template<char C, RustUnaryOperator OP>
+template <char C, RustUnaryOperator OP>
 RustExpressionUP Parser::Unary(Status &error) {
   Advance();
   RustExpressionUP result = Term(error);
@@ -1355,7 +1369,8 @@ RustExpressionUP Parser::Parens(Status &error) {
   if (CurrentToken().kind == ')') {
     // Unit tuple.
     Advance();
-    return std::make_unique<RustTupleExpression>(std::vector<RustExpressionUP>());
+    return std::make_unique<RustTupleExpression>(
+        std::vector<RustExpressionUP>());
   }
 
   RustExpressionUP expr = Expr(error);
@@ -1414,7 +1429,8 @@ RustExpressionUP Parser::Array(Status &error) {
       return length;
     }
 
-    result = std::make_unique<RustArrayWithLength>(std::move(expr), std::move(length));
+    result = std::make_unique<RustArrayWithLength>(std::move(expr),
+                                                   std::move(length));
   } else if (CurrentToken().kind == ',') {
     Advance();
     std::vector<RustExpressionUP> exprs;
@@ -1445,11 +1461,11 @@ RustExpressionUP Parser::Field(RustExpressionUP &&lhs, Status &error) {
   RustExpressionUP result;
   if (CurrentToken().kind == IDENTIFIER) {
     result = std::make_unique<RustFieldExpression>(std::move(lhs),
-                                                    CurrentToken().str);
+                                                   CurrentToken().str);
     Advance();
   } else if (CurrentToken().kind == INTEGER) {
-    result = std::make_unique<RustTupleFieldExpression>(std::move(lhs),
-                                                        CurrentToken().uinteger.getValue());
+    result = std::make_unique<RustTupleFieldExpression>(
+        std::move(lhs), CurrentToken().uinteger.getValue());
     Advance();
   } else {
     error.SetErrorString("identifier or integer expected");
@@ -1493,8 +1509,8 @@ RustExpressionUP Parser::Index(RustExpressionUP &&array, Status &error) {
   }
   Advance();
 
-  return std::make_unique<RustBinaryExpression<'@', ArrayIndex>>(std::move(array),
-                                                                  std::move(idx));
+  return std::make_unique<RustBinaryExpression<'@', ArrayIndex>>(
+      std::move(array), std::move(idx));
 }
 
 RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
@@ -1554,8 +1570,8 @@ RustExpressionUP Parser::Struct(RustTypeExpressionUP &&path, Status &error) {
   }
   Advance();
 
-  return std::make_unique<RustStructExpression>(std::move(path), std::move(inits),
-                                                std::move(copy));
+  return std::make_unique<RustStructExpression>(
+      std::move(path), std::move(inits), std::move(copy));
 }
 
 RustExpressionUP Parser::Path(Status &error) {
@@ -1618,16 +1634,16 @@ RustExpressionUP Parser::Path(Status &error) {
   }
 
   if (CurrentToken().kind == '{') {
-    RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers,
-                                                      std::move(path), std::move(type_list),
-                                                      true);
+    RustPathUP name_path =
+        std::make_unique<RustPath>(saw_self, relative, supers, std::move(path),
+                                   std::move(type_list), true);
     RustTypeExpressionUP type_path =
-      std::make_unique<RustPathTypeExpression>(std::move(name_path));
+        std::make_unique<RustPathTypeExpression>(std::move(name_path));
     return Struct(std::move(type_path), error);
   }
 
-  RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers,
-                                                     std::move(path), std::move(type_list));
+  RustPathUP name_path = std::make_unique<RustPath>(
+      saw_self, relative, supers, std::move(path), std::move(type_list));
   return std::make_unique<RustPathExpression>(std::move(name_path));
 }
 
@@ -1652,7 +1668,8 @@ RustExpressionUP Parser::Sizeof(Status &error) {
   }
   Advance();
 
-  return std::make_unique<RustUnaryExpression<'@', UnarySizeof>>(std::move(expr));
+  return std::make_unique<RustUnaryExpression<'@', UnarySizeof>>(
+      std::move(expr));
 }
 
 bool Parser::StartsTerm() {
@@ -1697,8 +1714,10 @@ RustExpressionUP Parser::Term(Status &error) {
     if (!suffix) {
       suffix = "i32";
     }
-    RustTypeExpressionUP type = std::make_unique<RustPathTypeExpression>(suffix);
-    term = std::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(), std::move(type));
+    RustTypeExpressionUP type =
+        std::make_unique<RustPathTypeExpression>(suffix);
+    term = std::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(),
+                                         std::move(type));
     Advance();
     break;
   }
@@ -1708,23 +1727,25 @@ RustExpressionUP Parser::Term(Status &error) {
     if (!suffix) {
       suffix = "f64";
     }
-    RustTypeExpressionUP type = std::make_unique<RustPathTypeExpression>(suffix);
-    term = std::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(), std::move(type));
+    RustTypeExpressionUP type =
+        std::make_unique<RustPathTypeExpression>(suffix);
+    term = std::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(),
+                                         std::move(type));
     Advance();
     break;
   }
 
   case STRING:
   case BYTESTRING:
-    term = std::make_unique<RustStringLiteral>(std::move(CurrentToken().str),
-                                                CurrentToken().kind == BYTESTRING);
+    term = std::make_unique<RustStringLiteral>(
+        std::move(CurrentToken().str), CurrentToken().kind == BYTESTRING);
     Advance();
     break;
 
   case CHAR:
   case BYTE:
     term = std::make_unique<RustCharLiteral>(CurrentToken().uinteger.getValue(),
-                                              CurrentToken().kind == BYTE);
+                                             CurrentToken().kind == BYTE);
     Advance();
     break;
 
@@ -1827,62 +1848,54 @@ RustExpressionUP Parser::Term(Status &error) {
   return term;
 }
 
-#define BINOP(Tag, What)                                        \
-  RustBinaryExpression< Tag, BinaryOperation< What<Scalar>, false > >
-#define COMP(Tag, What)                                         \
-  RustBinaryExpression< Tag, Comparison< What<Scalar> > >
-#define ASSIGN(Tag, What)                                       \
-  RustAssignExpression< Tag, BinaryOperation< What<Scalar>, true > >
+#define BINOP(Tag, What)                                                       \
+  RustBinaryExpression<Tag, BinaryOperation<What<Scalar>, false>>
+#define COMP(Tag, What) RustBinaryExpression<Tag, Comparison<What<Scalar>>>
+#define ASSIGN(Tag, What)                                                      \
+  RustAssignExpression<Tag, BinaryOperation<What<Scalar>, true>>
 
 // Couldn't find these in <functional>.
 
-template<typename T>
-class left_shift {
+template <typename T> class left_shift {
 public:
-  T operator()(const T &l, const T&r) {
-    return l << r;
-  }
+  T operator()(const T &l, const T &r) { return l << r; }
 };
 
-template<typename T>
-class right_shift {
+template <typename T> class right_shift {
 public:
-  T operator()(const T &l, const T&r) {
-    return l >> r;
-  }
+  T operator()(const T &l, const T &r) { return l >> r; }
 };
-
 
 // Binary operators.  Each line has the form:
 //   DEFINE(token, precedence, type)
-#define BINARY_OPERATORS                                        \
-  DEFINE(OROR, 3, RustOrOrExpression)                           \
-  DEFINE(ANDAND, 4, RustAndAndExpression)                       \
-  DEFINE(EQEQ, 5, COMP(EQEQ, std::equal_to))                    \
-  DEFINE(NOTEQ, 5, COMP(NOTEQ, std::not_equal_to))              \
-  DEFINE(LTEQ, 5, COMP(LTEQ, std::less_equal))                  \
-  DEFINE(GTEQ, 5, COMP(GTEQ, std::greater_equal))               \
-  DEFINE(LSH, 9, BINOP(LSH, left_shift))                        \
-  DEFINE(RSH, 9, BINOP(RSH, right_shift))                       \
-  DEFINE(PLUS_EQ, 1, ASSIGN(PLUS_EQ, std::plus))                \
-  DEFINE(MINUS_EQ, 1, ASSIGN(MINUS_EQ, std::minus))             \
-  DEFINE(SLASH_EQ, 1, ASSIGN(SLASH_EQ, std::divides))           \
-  DEFINE(STAR_EQ, 1, ASSIGN(STAR_EQ, std::multiplies))          \
-  DEFINE(PERCENT_EQ, 1, ASSIGN(PERCENT_EQ, std::modulus))       \
-  DEFINE(RSH_EQ, 1, ASSIGN(RSH_EQ, right_shift))                \
-  DEFINE(LSH_EQ, 1, ASSIGN(LSH_EQ, left_shift))                 \
-  DEFINE(AND_EQ, 1, ASSIGN(AND_EQ, std::bit_and))               \
-  DEFINE(OR_EQ, 1, ASSIGN(OR_EQ, std::bit_or))                  \
-  DEFINE(XOR_EQ, 1, ASSIGN(XOR_EQ, std::bit_xor))               \
-  DEFINE('|', 6, BINOP('|', std::bit_or))                       \
-  DEFINE('&', 8, BINOP('&', std::bit_and))                      \
-  DEFINE('=', 1, RustAssignment)                                \
-  DEFINE('<', 5, COMP('<', std::less))                          \
-  DEFINE('>', 5, COMP('>', std::greater))                       \
-  DEFINE('+', 10, BINOP('+', std::plus))                        \
-  DEFINE('-', 10, BINOP('-', std::minus))                       \
-  DEFINE('*', 11, BINOP('*', std::multiplies))                  \
-  DEFINE('/', 11, BINOP('/', std::divides))                     \
+#define BINARY_OPERATORS                                                       \
+  DEFINE(OROR, 3, RustOrOrExpression)                                          \
+  DEFINE(ANDAND, 4, RustAndAndExpression)                                      \
+  DEFINE(EQEQ, 5, COMP(EQEQ, std::equal_to))                                   \
+  DEFINE(NOTEQ, 5, COMP(NOTEQ, std::not_equal_to))                             \
+  DEFINE(LTEQ, 5, COMP(LTEQ, std::less_equal))                                 \
+  DEFINE(GTEQ, 5, COMP(GTEQ, std::greater_equal))                              \
+  DEFINE(LSH, 9, BINOP(LSH, left_shift))                                       \
+  DEFINE(RSH, 9, BINOP(RSH, right_shift))                                      \
+  DEFINE(PLUS_EQ, 1, ASSIGN(PLUS_EQ, std::plus))                               \
+  DEFINE(MINUS_EQ, 1, ASSIGN(MINUS_EQ, std::minus))                            \
+  DEFINE(SLASH_EQ, 1, ASSIGN(SLASH_EQ, std::divides))                          \
+  DEFINE(STAR_EQ, 1, ASSIGN(STAR_EQ, std::multiplies))                         \
+  DEFINE(PERCENT_EQ, 1, ASSIGN(PERCENT_EQ, std::modulus))                      \
+  DEFINE(RSH_EQ, 1, ASSIGN(RSH_EQ, right_shift))                               \
+  DEFINE(LSH_EQ, 1, ASSIGN(LSH_EQ, left_shift))                                \
+  DEFINE(AND_EQ, 1, ASSIGN(AND_EQ, std::bit_and))                              \
+  DEFINE(OR_EQ, 1, ASSIGN(OR_EQ, std::bit_or))                                 \
+  DEFINE(XOR_EQ, 1, ASSIGN(XOR_EQ, std::bit_xor))                              \
+  DEFINE('|', 6, BINOP('|', std::bit_or))                                      \
+  DEFINE('&', 8, BINOP('&', std::bit_and))                                     \
+  DEFINE('=', 1, RustAssignment)                                               \
+  DEFINE('<', 5, COMP('<', std::less))                                         \
+  DEFINE('>', 5, COMP('>', std::greater))                                      \
+  DEFINE('+', 10, BINOP('+', std::plus))                                       \
+  DEFINE('-', 10, BINOP('-', std::minus))                                      \
+  DEFINE('*', 11, BINOP('*', std::multiplies))                                 \
+  DEFINE('/', 11, BINOP('/', std::divides))                                    \
   DEFINE('%', 11, BINOP('%', std::modulus))
 
 RustExpressionUP Parser::Binary(Status &error) {
@@ -1892,11 +1905,7 @@ RustExpressionUP Parser::Binary(Status &error) {
     RustExpressionUP term;
 
     Operation(int precedence_, int op_, RustExpressionUP &&term_)
-      : precedence(precedence_),
-        op(op_),
-        term(std::move(term_))
-    {
-    }
+        : precedence(precedence_), op(op_), term(std::move(term_)) {}
   };
 
   RustExpressionUP term = Term(error);
@@ -1913,8 +1922,11 @@ RustExpressionUP Parser::Binary(Status &error) {
     int kind = CurrentToken().kind;
 
     switch (kind) {
-#define DEFINE(Token, Prec, Type)                       \
-      case Token: precedence = Prec; Advance(); break;
+#define DEFINE(Token, Prec, Type)                                              \
+  case Token:                                                                  \
+    precedence = Prec;                                                         \
+    Advance();                                                                 \
+    break;
 
       BINARY_OPERATORS
 #undef DEFINE
@@ -1948,10 +1960,11 @@ RustExpressionUP Parser::Binary(Status &error) {
       Operation &lhs = operations.back();
 
       switch (top.op) {
-#define DEFINE(Token, Prec, Type)                                       \
-        case Token:                                                     \
-          lhs.term = std::make_unique<Type>(std::move(lhs.term), std::move(top.term)); \
-          break;
+#define DEFINE(Token, Prec, Type)                                              \
+  case Token:                                                                  \
+    lhs.term =                                                                 \
+        std::make_unique<Type>(std::move(lhs.term), std::move(top.term));      \
+    break;
 
         BINARY_OPERATORS
 #undef DEFINE
@@ -1996,7 +2009,8 @@ RustExpressionUP Parser::Range(Status &error) {
     }
   }
 
-  return std::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs), is_inclusive);
+  return std::make_unique<RustRangeExpression>(std::move(lhs), std::move(rhs),
+                                               is_inclusive);
 }
 
 ////////////////////////////////////////////////////////////////
@@ -2065,7 +2079,8 @@ RustTypeExpressionUP Parser::ReferenceType(Status &error) {
     return std::make_unique<RustSliceTypeExpression>(std::move(target), is_mut);
   }
 
-  return std::make_unique<RustPointerTypeExpression>(std::move(target), true, is_mut);
+  return std::make_unique<RustPointerTypeExpression>(std::move(target), true,
+                                                     is_mut);
 }
 
 RustTypeExpressionUP Parser::PointerType(Status &error) {
@@ -2086,10 +2101,12 @@ RustTypeExpressionUP Parser::PointerType(Status &error) {
     return target;
   }
 
-  return std::make_unique<RustPointerTypeExpression>(std::move(target), false, is_mut);
+  return std::make_unique<RustPointerTypeExpression>(std::move(target), false,
+                                                     is_mut);
 }
 
-bool Parser::TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+bool Parser::TypeList(std::vector<RustTypeExpressionUP> *type_list,
+                      Status &error) {
   while (true) {
     RustTypeExpressionUP t = Type(error);
     if (!t) {
@@ -2105,7 +2122,8 @@ bool Parser::TypeList(std::vector<RustTypeExpressionUP> *type_list, Status &erro
   return true;
 }
 
-bool Parser::ParenTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+bool Parser::ParenTypeList(std::vector<RustTypeExpressionUP> *type_list,
+                           Status &error) {
   if (CurrentToken().kind != '(') {
     error.SetErrorStringWithFormat("'(' expected");
     return false;
@@ -2127,7 +2145,8 @@ bool Parser::ParenTypeList(std::vector<RustTypeExpressionUP> *type_list, Status 
   return true;
 }
 
-bool Parser::BracketTypeList(std::vector<RustTypeExpressionUP> *type_list, Status &error) {
+bool Parser::BracketTypeList(std::vector<RustTypeExpressionUP> *type_list,
+                             Status &error) {
   if (CurrentToken().kind != '<') {
     error.SetErrorStringWithFormat("'<' expected");
     return false;
@@ -2247,8 +2266,8 @@ RustTypeExpressionUP Parser::TypePath(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  RustPathUP name_path = std::make_unique<RustPath>(saw_self, relative, supers, std::move(path),
-                                                    std::move(type_list));
+  RustPathUP name_path = std::make_unique<RustPath>(
+      saw_self, relative, supers, std::move(path), std::move(type_list));
   return std::make_unique<RustPathTypeExpression>(std::move(name_path));
 }
 
