@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 #include "RustFunctionCaller.h"
+#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 
 #include "Plugins/ExpressionParser/Clang/ClangExpressionParser.h"
 
@@ -18,14 +18,13 @@
 #include "llvm/IR/Module.h"
 
 #include "lldb/Core/Module.h"
-#include "lldb/Utility/State.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Core/ValueObjectList.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Expression/IRExecutionUnit.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/Function.h"
+#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/Type.h"
 #include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/Process.h"
@@ -36,6 +35,7 @@
 #include "lldb/Target/ThreadPlanCallFunction.h"
 #include "lldb/Utility/DataExtractor.h"
 #include "lldb/Utility/Log.h"
+#include "lldb/Utility/State.h"
 
 using namespace lldb_private;
 
@@ -48,19 +48,18 @@ RustFunctionCaller::RustFunctionCaller(ExecutionContextScope &exe_scope,
                                        const Address &functionAddress,
                                        const ValueList &arg_value_list,
                                        const char *name)
-  : ClangFunctionCaller(exe_scope, return_type, functionAddress, arg_value_list, name),
-    m_function_type(function_type)
-{
-}
+    : ClangFunctionCaller(exe_scope, return_type, functionAddress,
+                          arg_value_list, name),
+      m_function_type(function_type) {}
 
 //----------------------------------------------------------------------
 // Destructor
 //----------------------------------------------------------------------
 RustFunctionCaller::~RustFunctionCaller() {}
 
-static bool
-AppendType(std::string *output, RustASTContext *ast, RustASTContext::TypeNameMap *name_map,
-           const std::string &varname, CompilerType type) {
+static bool AppendType(std::string *output, RustASTContext *ast,
+                       RustASTContext::TypeNameMap *name_map,
+                       const std::string &varname, CompilerType type) {
   std::string value;
   if (!ast->GetCABITypeDeclaration(type, varname, name_map, &value)) {
     return false;
@@ -71,20 +70,22 @@ AppendType(std::string *output, RustASTContext *ast, RustASTContext::TypeNameMap
   return true;
 }
 
-unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
-                                             DiagnosticManager &diagnostic_manager) {
+unsigned
+RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
+                                    DiagnosticManager &diagnostic_manager) {
   if (m_compiled)
     return 0;
 
   // Compilation might call code, make sure to keep on the thread the caller
   // indicated.
   ThreadList::ExpressionExecutionThreadPusher execution_thread_pusher(
-                                                                      thread_to_use_sp);
+      thread_to_use_sp);
 
-  RustASTContext *ast =
-    llvm::dyn_cast_or_null<RustASTContext>(m_function_return_type.GetTypeSystem());
+  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(
+      m_function_return_type.GetTypeSystem());
   if (!ast) {
-    diagnostic_manager.PutString(eDiagnosticSeverityError, "not in a Rust context!?");
+    diagnostic_manager.PutString(eDiagnosticSeverityError,
+                                 "not in a Rust context!?");
     return 1;
   }
 
@@ -121,7 +122,8 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   }
 
   // This was ensured by the caller.
-  assert(unsigned(m_function_type.GetNumberOfFunctionArguments()) == m_arg_values.GetSize());
+  assert(unsigned(m_function_type.GetNumberOfFunctionArguments()) ==
+         m_arg_values.GetSize());
 
   std::string arguments;
   for (int i = 0; i < m_function_type.GetFunctionArgumentCount(); ++i) {
@@ -136,7 +138,8 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
     // FIXME work around a FunctionCaller problem.  Note that the
     // actual argument is already a pointer at this point, see
     // RustParse.
-    bool is_aggregate = m_function_type.GetFunctionArgumentTypeAtIndex(i).IsAggregateType();
+    bool is_aggregate =
+        m_function_type.GetFunctionArgumentTypeAtIndex(i).IsAggregateType();
 
     std::string argname = "__arg_" + std::to_string(i);
     if (!AppendType(&code, ast, &name_map, argname, arg_type)) {
@@ -173,7 +176,8 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   m_wrapper_function_text.append(m_wrapper_struct_name);
   m_wrapper_function_text.append(" *) input;\n");
 
-  m_wrapper_function_text.append("  __lldb_fn_data->result = __lldb_fn_data->fn_ptr(");
+  m_wrapper_function_text.append(
+      "  __lldb_fn_data->result = __lldb_fn_data->fn_ptr(");
   m_wrapper_function_text.append(arguments);
   m_wrapper_function_text.append(");\n}\n");
 
@@ -186,7 +190,8 @@ unsigned RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   lldb::ProcessSP jit_process_sp(m_jit_process_wp.lock());
   unsigned num_errors;
   if (jit_process_sp) {
-    auto *clang_parser = new ClangExpressionParser(jit_process_sp.get(), *this, true);
+    auto *clang_parser =
+        new ClangExpressionParser(jit_process_sp.get(), *this, true);
     num_errors = clang_parser->Parse(diagnostic_manager);
     m_parser.reset(clang_parser);
   } else {
