@@ -24,9 +24,7 @@ using namespace lldb;
 using namespace lldb_private;
 
 RustLanguageRuntime::RustLanguageRuntime(Process *process)
-    : LanguageRuntime(process)
-{
-}
+    : LanguageRuntime(process) {}
 
 LanguageRuntime *
 RustLanguageRuntime::CreateInstance(Process *process,
@@ -54,12 +52,11 @@ lldb_private::ConstString RustLanguageRuntime::GetPluginName() {
   return GetPluginNameStatic();
 }
 
-uint32_t RustLanguageRuntime::GetPluginVersion() {
-  return 1;
-}
+uint32_t RustLanguageRuntime::GetPluginVersion() { return 1; }
 
 bool RustLanguageRuntime::CouldHaveDynamicValue(ValueObject &in_value) {
-  return in_value.GetCompilerType().IsPossibleDynamicType(nullptr, false, false);
+  return in_value.GetCompilerType().IsPossibleDynamicType(nullptr, false,
+                                                          false);
 }
 
 bool RustLanguageRuntime::GetDynamicTypeAndAddress(
@@ -70,7 +67,8 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
   value_type = Value::ValueType::eValueTypeScalar;
 
   CompilerType type = in_value.GetCompilerType();
-  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  RustASTContext *ast =
+      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
 
   if (!ast) {
     return false;
@@ -90,9 +88,8 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
     }
 
     Status error;
-    uint64_t discriminant =
-      process->ReadUnsignedIntegerFromMemory(original_ptr + discr_offset, discr_byte_size,
-                                             0, error);
+    uint64_t discriminant = process->ReadUnsignedIntegerFromMemory(
+        original_ptr + discr_offset, discr_byte_size, 0, error);
     if (!error.Success()) {
       return false;
     }
