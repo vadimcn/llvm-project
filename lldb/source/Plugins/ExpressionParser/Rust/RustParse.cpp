@@ -521,18 +521,18 @@ bool RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
 
     CompilerDeclContext found_ns;
     for (const ConstString &ns_name : fullname) {
-      found_ns = symbol_file->FindNamespace(ns_name, &found_ns);
+      found_ns = symbol_file->FindNamespace(ns_name, found_ns);
       if (!found_ns) {
         break;
       }
     }
 
     if (found_ns) {
-      mod->FindGlobalVariables(cs_name, &found_ns, 1, var_list);
+      mod->FindGlobalVariables(cs_name, found_ns, 1, var_list);
 
       SymbolContextList context_list;
-      mod->FindFunctions(cs_name, &found_ns, eFunctionNameTypeBase, false,
-                         false, context_list);
+      mod->FindFunctions(cs_name, found_ns, eFunctionNameTypeBase, false, false,
+                         context_list);
       for (size_t i = 0; i < context_list.GetSize(); ++i) {
         SymbolContext sym_context;
         if (context_list.GetContextAtIndex(i, sym_context) &&
