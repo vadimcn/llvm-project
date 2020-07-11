@@ -52,7 +52,9 @@ class RustTypedef;
 class RustType {
 protected:
   RustType(const ConstString &name) : m_name(name) {}
-  DISALLOW_COPY_AND_ASSIGN(RustType);
+
+  RustType(const RustType &) = delete;
+  const RustType &operator=(const RustType &) = delete;
 
 public:
   virtual ~RustType() {}
@@ -91,7 +93,9 @@ private:
 class RustBool : public RustType {
 public:
   RustBool(const ConstString &name) : RustType(name) {}
-  DISALLOW_COPY_AND_ASSIGN(RustBool);
+
+  RustBool(const RustBool &) = delete;
+  const RustBool &operator=(const RustBool &) = delete;
 
   RustBool *AsBool() override { return this; }
 
@@ -117,7 +121,9 @@ public:
                bool is_char = false)
       : RustType(name), m_is_signed(is_signed), m_byte_size(byte_size),
         m_is_char(is_char) {}
-  DISALLOW_COPY_AND_ASSIGN(RustIntegral);
+
+  RustIntegral(const RustIntegral &) = delete;
+  const RustIntegral &operator=(const RustIntegral &) = delete;
 
   lldb::Format Format() const override {
     if (m_is_char)
@@ -165,7 +171,9 @@ public:
                 std::map<uint64_t, std::string> &&values)
       : RustType(name), m_underlying_type(underlying_type),
         m_values(std::move(values)) {}
-  DISALLOW_COPY_AND_ASSIGN(RustCLikeEnum);
+
+  RustCLikeEnum(const RustCLikeEnum &) = delete;
+  const RustCLikeEnum &operator=(const RustCLikeEnum &) = delete;
 
   RustCLikeEnum *AsCLikeEnum() override { return this; }
 
@@ -210,7 +218,9 @@ class RustFloat : public RustType {
 public:
   RustFloat(const ConstString &name, uint64_t byte_size)
       : RustType(name), m_byte_size(byte_size) {}
-  DISALLOW_COPY_AND_ASSIGN(RustFloat);
+
+  RustFloat(const RustFloat &) = delete;
+  const RustFloat &operator=(const RustFloat &) = delete;
 
   lldb::Format Format() const override { return eFormatFloat; }
 
@@ -239,7 +249,9 @@ public:
   RustPointer(const ConstString &name, const CompilerType &pointee,
               uint64_t byte_size)
       : RustType(name), m_pointee(pointee), m_byte_size(byte_size) {}
-  DISALLOW_COPY_AND_ASSIGN(RustPointer);
+
+  RustPointer(const RustPointer &) = delete;
+  const RustPointer &operator=(const RustPointer &) = delete;
 
   lldb::Format Format() const override { return eFormatPointer; }
 
@@ -276,7 +288,9 @@ class RustArray : public RustType {
 public:
   RustArray(const ConstString &name, uint64_t length, const CompilerType &elem)
       : RustType(name), m_length(length), m_elem(elem) {}
-  DISALLOW_COPY_AND_ASSIGN(RustArray);
+
+  RustArray(const RustArray &) = delete;
+  const RustArray &operator=(const RustArray &) = delete;
 
   uint64_t Length() const { return m_length; }
   RustArray *AsArray() override { return this; }
@@ -315,7 +329,8 @@ protected:
       : RustType(name), m_byte_size(byte_size),
         m_has_discriminant(has_discriminant) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustAggregateBase);
+  RustAggregateBase(const RustAggregateBase &) = delete;
+  const RustAggregateBase &operator=(const RustAggregateBase &) = delete;
 
 public:
   RustAggregateBase *AsAggregate() override { return this; }
@@ -426,7 +441,8 @@ public:
   RustTuple(const ConstString &name, uint64_t byte_size, bool has_discriminant)
       : RustAggregateBase(name, byte_size, has_discriminant) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustTuple);
+  RustTuple(const RustTuple &) = delete;
+  const RustTuple &operator=(const RustTuple &) = delete;
 
   RustTuple *AsTuple() override { return this; }
 
@@ -481,7 +497,8 @@ public:
   RustStruct(const ConstString &name, uint64_t byte_size, bool has_discriminant)
       : RustAggregateBase(name, byte_size, has_discriminant) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustStruct);
+  RustStruct(const RustStruct &) = delete;
+  const RustStruct &operator=(const RustStruct &) = delete;
 
   const char *Tag() const override { return "struct "; }
   const char *Opener() const override { return "{"; }
@@ -504,7 +521,8 @@ public:
   RustUnion(const ConstString &name, uint64_t byte_size)
       : RustAggregateBase(name, byte_size) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustUnion);
+  RustUnion(const RustUnion &) = delete;
+  const RustUnion &operator=(const RustUnion &) = delete;
 
   const char *Tag() const override { return "union "; }
   const char *Opener() const override { return "{"; }
@@ -530,7 +548,8 @@ public:
       : RustAggregateBase(name, byte_size), m_discr_offset(discr_offset),
         m_discr_byte_size(discr_byte_size), m_default(-1) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustEnum);
+  RustEnum(const RustEnum &) = delete;
+  const RustEnum &operator=(const RustEnum &) = delete;
 
   RustEnum *AsEnum() override { return this; }
 
@@ -621,7 +640,9 @@ public:
       : RustType(name), m_byte_size(byte_size), m_return_type(return_type),
         m_arguments(std::move(arguments)),
         m_template_args(std::move(template_arguments)) {}
-  DISALLOW_COPY_AND_ASSIGN(RustFunction);
+
+  RustFunction(const RustFunction &) = delete;
+  const RustFunction &operator=(const RustFunction &) = delete;
 
   // do we care about the names?
   void AddArgument(const CompilerType &type) { m_arguments.push_back(type); }
@@ -677,7 +698,8 @@ public:
   RustTypedef(const ConstString &name, const CompilerType &type)
       : RustType(name), m_type(type) {}
 
-  DISALLOW_COPY_AND_ASSIGN(RustTypedef);
+  RustTypedef(const RustTypedef &) = delete;
+  const RustTypedef &operator=(const RustTypedef &) = delete;
 
   RustTypedef *AsTypedef() override { return this; }
   CompilerType UnderlyingType() const { return m_type; }
@@ -1079,6 +1101,11 @@ ConstString RustASTContext::GetTypeName(lldb::opaque_compiler_type_t type) {
   return ConstString();
 }
 
+ConstString
+RustASTContext::GetDisplayTypeName(lldb::opaque_compiler_type_t type) {
+  return GetTypeName(type);
+}
+
 uint32_t
 RustASTContext::GetTypeInfo(lldb::opaque_compiler_type_t type,
                             CompilerType *pointee_or_element_compiler_type) {
@@ -1383,7 +1410,7 @@ CompilerType RustASTContext::GetFieldAtIndex(lldb::opaque_compiler_type_t type,
   if (RustAggregateBase *s = t->AsAggregate()) {
     const auto *field = s->FieldAt(idx);
     if (field) {
-      name = field->m_name.GetStringRef();
+      name = field->m_name.GetStringRef().str();
       if (bit_offset_ptr)
         *bit_offset_ptr = field->m_offset * 8;
       return field->m_type;
@@ -1695,14 +1722,16 @@ void RustASTContext::DumpSummary(lldb::opaque_compiler_type_t type,
   // Apparently there is nothing to do here.
 }
 
-void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type) {
+void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type,
+                                         lldb::DescriptionLevel level) {
   // Dump to stdout
   StreamFile s(stdout, false);
   DumpTypeDescription(type, &s);
 }
 
 void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type,
-                                         Stream *s) {
+                                         Stream *s,
+                                         lldb::DescriptionLevel level) {
   if (!type)
     return;
   ConstString name = GetTypeName(type);
