@@ -221,6 +221,8 @@ public:
 
   ConstString GetTypeName(lldb::opaque_compiler_type_t type) override;
 
+  ConstString GetDisplayTypeName(lldb::opaque_compiler_type_t type) override;
+
   uint32_t GetTypeInfo(
       lldb::opaque_compiler_type_t type,
       CompilerType *pointee_or_element_compiler_type = nullptr) override;
@@ -376,10 +378,12 @@ public:
                      ExecutionContextScope *exe_scope) override;
 
   void DumpTypeDescription(
-      lldb::opaque_compiler_type_t type) override; // Dump to stdout
+      lldb::opaque_compiler_type_t type,
+      lldb::DescriptionLevel level = lldb::eDescriptionLevelFull) override;
 
-  void DumpTypeDescription(lldb::opaque_compiler_type_t type,
-                           Stream *s) override;
+  void DumpTypeDescription(
+      lldb::opaque_compiler_type_t type, Stream *s,
+      lldb::DescriptionLevel level = lldb::eDescriptionLevelFull) override;
 
   bool IsRuntimeGeneratedType(lldb::opaque_compiler_type_t type) override;
 

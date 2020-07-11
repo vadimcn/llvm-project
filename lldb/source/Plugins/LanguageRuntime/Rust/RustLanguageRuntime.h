@@ -49,9 +49,9 @@ public:
     return false;
   }
 
-  lldb::BreakpointResolverSP CreateExceptionResolver(Breakpoint *bkpt,
-                                                     bool catch_bp,
-                                                     bool throw_bp) override {
+  lldb::BreakpointResolverSP
+  CreateExceptionResolver(const lldb::BreakpointSP &bkpt, bool catch_bp,
+                          bool throw_bp) override {
     return nullptr;
   }
 
@@ -75,7 +75,8 @@ protected:
   RustLanguageRuntime(Process *process);
 
 private:
-  DISALLOW_COPY_AND_ASSIGN(RustLanguageRuntime);
+  RustLanguageRuntime(const RustLanguageRuntime &) = delete;
+  const RustLanguageRuntime &operator=(const RustLanguageRuntime &) = delete;
 };
 
 } // namespace lldb_private
