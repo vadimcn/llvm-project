@@ -479,30 +479,22 @@ bool SetNumberFromPyObject<double>(double &number, PyObject *obj) {
 %inline %{
 
 struct Py_buffer_RAII {
-  Py_buffer buffer = {};
+  PyObject *obj = 0;
+
   Py_buffer_RAII() {};
-  Py_buffer &operator=(const Py_buffer_RAII &) = delete;
+  Py_buffer_RAII &operator=(const Py_buffer_RAII &) = delete;
   Py_buffer_RAII(const Py_buffer_RAII &) = delete;
   ~Py_buffer_RAII() {
-    if (buffer.obj)
-      PyBuffer_Release(&buffer);
+    Py_XDECREF(obj);
   }
 };
 
 %}
-
-// These two pybuffer macros are copied out of swig/Lib/python/pybuffer.i,
-// and fixed so they will not crash if PyObject_GetBuffer fails.
-// https://github.com/swig/swig/issues/1640
-//
-// I've also moved the call to PyBuffer_Release to the end of the SWIG wrapper,
-// doing it right away is not legal according to the python buffer protocol.
-
 %define %pybuffer_mutable_binary(TYPEMAP, SIZE)
 %typemap(in) (TYPEMAP, SIZE) (Py_buffer_RAII view) {
-  int res;
-  const char *buf;
-  int size;
+  int res; Py_ssize_t size = 0; void *buf = 0;
+  view.obj = $input;
+  Py_INCREF(view.obj);
   if (!PyArg_Parse($input, "y#", &buf, &size)) {
     PyErr_Clear();
     %argument_fail(res, "(TYPEMAP, SIZE)", $symname, $argnum);
@@ -514,9 +506,9 @@ struct Py_buffer_RAII {
 
 %define %pybuffer_binary(TYPEMAP, SIZE)
 %typemap(in) (TYPEMAP, SIZE) (Py_buffer_RAII view) {
-  int res;
-  const char *buf;
-  int size;
+  int res; Py_ssize_t size = 0; void *buf = 0;
+  view.obj = $input;
+  Py_INCREF(view.obj);
   if (!PyArg_Parse($input, "y#", &buf, &size)) {
     PyErr_Clear();
     %argument_fail(res, "(TYPEMAP, SIZE)", $symname, $argnum);
