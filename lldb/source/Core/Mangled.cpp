@@ -347,9 +347,9 @@ ConstString Mangled::GetDemangledName() const {
       case eManglingSchemeItanium: {
         demangled_name = GetItaniumDemangledStr(mangled_name);
 
-        if (language == lldb::eLanguageTypeRust) {
-          remove_rust_hash(demangled_name);
-        }
+        // if (language == lldb::eLanguageTypeRust) {
+        //   remove_rust_hash(demangled_name);
+        // }
 
         break;
       }
