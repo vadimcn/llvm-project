@@ -828,10 +828,10 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     // will automatically call the SymbolFile virtual function
     // "SymbolFileDWARF::CompleteType(Type *)"
     // When the definition needs to be defined.
-    dwarf->m_forward_decl_die_to_clang_type[die.GetDIE()] =
+    dwarf->GetForwardDeclDieToClangType()[die.GetDIE()] =
         compiler_type.GetOpaqueQualType();
-    dwarf->m_forward_decl_clang_type_to_die[compiler_type.GetOpaqueQualType()] =
-        die.GetID();
+    dwarf->GetForwardDeclClangTypeToDie().try_emplace(
+        compiler_type.GetOpaqueQualType(), *die.GetDIERef());
   }
 
   return type_sp;
