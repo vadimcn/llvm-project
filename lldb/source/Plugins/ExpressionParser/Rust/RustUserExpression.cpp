@@ -59,8 +59,7 @@ RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
   PersistentExpressionState *pv =
       target->GetPersistentExpressionStateForLanguage(eLanguageTypeRust);
   if (pv != nullptr) {
-    result->SetName(pv->GetNextPersistentVariableName(
-        *target, pv->GetPersistentVariablePrefix()));
+    result->SetName(pv->GetNextPersistentVariableName(false));
     pv->AddVariable(result);
   }
 
