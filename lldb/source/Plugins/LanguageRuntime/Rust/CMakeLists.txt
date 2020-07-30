@@ -1,4 +1,4 @@
-add_lldb_library(lldbPluginLanguageRuntimeRust PLUGIN
+add_lldb_library(lldbPluginRustLanguageRuntime PLUGIN
   RustLanguageRuntime.cpp
 
   LINK_LIBS
