@@ -22,12 +22,14 @@
 #include "lldb/Core/PluginManager.h"
 #include "lldb/DataFormatters/DataVisualization.h"
 #include "lldb/DataFormatters/FormattersHelpers.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Utility/ConstString.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 
 using namespace lldb;
 using namespace lldb_private;
 using namespace lldb_private::formatters;
+
+LLDB_PLUGIN_DEFINE(RustLanguage)
 
 void RustLanguage::Initialize() {
   PluginManager::RegisterPlugin(GetPluginNameStatic(), "Rust Language",
