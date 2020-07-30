@@ -10,14 +10,14 @@ from lldbsuite.test.lldbtest import *
 from lldbsuite.test import lldbutil
 
 
-class TestRustASTContext(TestBase):
+class TestTypeSystemRust(TestBase):
     mydir = TestBase.compute_mydir(__file__)
 
     @add_test_categories(['pyapi'])
     @no_debug_info_test
     @skipUnlessRustInstalled
     def test_with_dsym_and_python_api(self):
-        """Test RustASTContext DWARF parsing."""
+        """Test TypeSystemRust DWARF parsing."""
         self.buildRust()
         self.launchProcess()
         self.init_typelist()
