@@ -9,10 +9,10 @@
 
 #include "RustUserExpression.h"
 #include "Plugins/ExpressionParser/Rust/RustParse.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Expression/ExpressionVariable.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Target/Target.h"
 
 using namespace lldb_private::rust;

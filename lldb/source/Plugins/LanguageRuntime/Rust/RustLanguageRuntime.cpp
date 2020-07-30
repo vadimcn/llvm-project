@@ -10,7 +10,6 @@
 #include "RustLanguageRuntime.h"
 
 #include "lldb/Core/PluginManager.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/Symbol.h"
 #include "lldb/Symbol/SymbolContext.h"
 #include "lldb/Symbol/SymbolFile.h"
@@ -19,6 +18,9 @@
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
 #include "llvm/ADT/StringRef.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
+
+LLDB_PLUGIN_DEFINE(RustLanguageRuntime)
 
 using namespace lldb;
 using namespace lldb_private;
@@ -67,8 +69,8 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
   value_type = Value::ValueType::eValueTypeScalar;
 
   CompilerType type = in_value.GetCompilerType();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
 
   if (!ast) {
     return false;
