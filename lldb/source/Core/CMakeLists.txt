@@ -83,8 +83,8 @@ add_lldb_library(lldbCore
     lldbUtility
     lldbPluginCPlusPlusLanguage
     lldbPluginObjCLanguage
-    lldbPluginExpressionParserRust
-    lldbPluginLanguageRuntimeRust
+    lldbPluginRustExpressionParser
+    lldbPluginRustLanguageRuntime
     ${LLDB_CURSES_LIBS}
 
   CLANG_LIBS

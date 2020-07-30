@@ -8,9 +8,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustFunctionCaller.h"
-#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 
+#include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
 #include "Plugins/ExpressionParser/Clang/ClangExpressionParser.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Triple.h"
@@ -24,7 +25,6 @@
 #include "lldb/Expression/IRExecutionUnit.h"
 #include "lldb/Interpreter/CommandReturnObject.h"
 #include "lldb/Symbol/Function.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/Type.h"
 #include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/Process.h"
@@ -57,8 +57,8 @@ RustFunctionCaller::RustFunctionCaller(ExecutionContextScope &exe_scope,
 //----------------------------------------------------------------------
 RustFunctionCaller::~RustFunctionCaller() {}
 
-static bool AppendType(std::string *output, RustASTContext *ast,
-                       RustASTContext::TypeNameMap *name_map,
+static bool AppendType(std::string *output, TypeSystemRust *ast,
+                       TypeSystemRust::TypeNameMap *name_map,
                        const std::string &varname, CompilerType type) {
   std::string value;
   if (!ast->GetCABITypeDeclaration(type, varname, name_map, &value)) {
@@ -81,7 +81,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   ThreadList::ExpressionExecutionThreadPusher execution_thread_pusher(
       thread_to_use_sp);
 
-  RustASTContext *ast = llvm::dyn_cast_or_null<RustASTContext>(
+  TypeSystemRust *ast = llvm::dyn_cast_or_null<TypeSystemRust>(
       m_function_return_type.GetTypeSystem());
   if (!ast) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
@@ -107,7 +107,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   m_wrapper_function_text.append("  struct a : empty { };\n");
   m_wrapper_function_text.append("  struct b : empty { };\n");
 
-  RustASTContext::TypeNameMap name_map;
+  TypeSystemRust::TypeNameMap name_map;
   std::string code;
   code.append("  struct ");
   code.append(m_wrapper_struct_name);
