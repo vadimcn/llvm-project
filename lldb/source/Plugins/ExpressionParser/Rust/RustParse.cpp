@@ -8,12 +8,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustParse.h"
+#include "lldb/Core/PluginManager.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Symbol/Block.h"
 #include "lldb/Symbol/Function.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/TypeList.h"
 #include "lldb/Symbol/VariableList.h"
@@ -23,6 +23,7 @@
 #include <set>
 
 #include "Plugins/ExpressionParser/Clang/ASTStructExtractor.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 #include "RustFunctionCaller.h"
 
 using namespace lldb_private::rust;
@@ -34,27 +35,27 @@ static std::set<std::string> primitive_type_names{
     "bool", "char", "u8",  "u16", "u32",  "u64", "u128",
     "i8",   "i16",  "i32", "i64", "i128", "f32", "f64"};
 
-static RustASTContext *GetASTContext(CompilerType type, Status &error) {
-  RustASTContext *result =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+static TypeSystemRust *GetASTContext(CompilerType type, Status &error) {
+  TypeSystemRust *result =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
   return result;
 }
 
-static RustASTContext *GetASTContext(ValueObjectSP val, Status &error) {
+static TypeSystemRust *GetASTContext(ValueObjectSP val, Status &error) {
   return GetASTContext(val->GetCompilerType(), error);
 }
 
-static RustASTContext *GetASTContext(ExecutionContext &ctxt, Status &error) {
+static TypeSystemRust *GetASTContext(ExecutionContext &ctxt, Status &error) {
   Target *target = ctxt.GetTargetPtr();
   auto sys_or_err = target->GetScratchTypeSystemForLanguage(eLanguageTypeRust);
   if (!sys_or_err) {
     return nullptr;
   }
-  RustASTContext *result =
-      llvm::dyn_cast_or_null<RustASTContext>(&sys_or_err.get());
+  TypeSystemRust *result =
+      llvm::dyn_cast_or_null<TypeSystemRust>(&sys_or_err.get());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
@@ -159,7 +160,7 @@ ValueObjectSP lldb_private::rust::UnaryAddr(ExecutionContext &exe_ctx,
 
 ValueObjectSP lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx,
                                             ValueObjectSP val, Status &error) {
-  if (RustASTContext *ast = GetASTContext(val, error)) {
+  if (TypeSystemRust *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (type.IsScalarType() && !ast->IsBooleanType(type.GetOpaqueQualType())) {
       return val;
@@ -172,7 +173,7 @@ ValueObjectSP lldb_private::rust::UnaryPlus(ExecutionContext &exe_ctx,
 ValueObjectSP lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx,
                                               ValueObjectSP val,
                                               Status &error) {
-  if (RustASTContext *ast = GetASTContext(val, error)) {
+  if (TypeSystemRust *ast = GetASTContext(val, error)) {
     CompilerType type = val->GetCompilerType();
     if (!type.IsScalarType() || ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a scalar type");
@@ -197,7 +198,7 @@ ValueObjectSP lldb_private::rust::UnaryNegate(ExecutionContext &exe_ctx,
 ValueObjectSP lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx,
                                                   ValueObjectSP val,
                                                   Status &error) {
-  RustASTContext *ast = GetASTContext(val, error);
+  TypeSystemRust *ast = GetASTContext(val, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -227,7 +228,7 @@ ValueObjectSP lldb_private::rust::UnaryComplement(ExecutionContext &exe_ctx,
 ValueObjectSP lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx,
                                               ValueObjectSP val,
                                               Status &error) {
-  if (RustASTContext *ast = GetASTContext(val, error)) {
+  if (TypeSystemRust *ast = GetASTContext(val, error)) {
     uint32_t ptr_size = ast->GetPointerByteSize();
     CompilerType type =
         ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
@@ -242,7 +243,7 @@ ValueObjectSP lldb_private::rust::BinaryOperation(ExecutionContext &exe_ctx,
                                                   lldb::ValueObjectSP left,
                                                   lldb::ValueObjectSP right,
                                                   Status &error) {
-  RustASTContext *ast = GetASTContext(left, error);
+  TypeSystemRust *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -323,7 +324,7 @@ ValueObjectSP lldb_private::rust::Comparison(ExecutionContext &exe_ctx,
                                              lldb::ValueObjectSP left,
                                              lldb::ValueObjectSP right,
                                              Status &error) {
-  RustASTContext *ast = GetASTContext(left, error);
+  TypeSystemRust *ast = GetASTContext(left, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -355,7 +356,7 @@ ValueObjectSP lldb_private::rust::ArrayIndex(ExecutionContext &exe_ctx,
     error.SetErrorString("not a scalar type");
     return ValueObjectSP();
   }
-  if (RustASTContext *ast = GetASTContext(right, error)) {
+  if (TypeSystemRust *ast = GetASTContext(right, error)) {
     CompilerType type = right->GetCompilerType();
     if (ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a scalar type");
@@ -404,7 +405,7 @@ bool RustPath::GetDeclContext(ExecutionContext &exe_ctx, Status &error,
                               CompilerDeclContext *result, bool *simple_name) {
   *simple_name = true;
 
-  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  TypeSystemRust *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return false;
   }
@@ -480,7 +481,7 @@ bool RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
     // ... but still look in the current context.
   }
 
-  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  TypeSystemRust *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return false;
   }
@@ -619,7 +620,7 @@ lldb::ValueObjectSP RustLiteral::Evaluate(ExecutionContext &exe_ctx,
 
 lldb::ValueObjectSP RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx,
                                                  Status &error) {
-  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  TypeSystemRust *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -631,7 +632,7 @@ lldb::ValueObjectSP RustBooleanLiteral::Evaluate(ExecutionContext &exe_ctx,
 
 lldb::ValueObjectSP RustCharLiteral::Evaluate(ExecutionContext &exe_ctx,
                                               Status &error) {
-  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  TypeSystemRust *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -648,7 +649,7 @@ lldb::ValueObjectSP RustCharLiteral::Evaluate(ExecutionContext &exe_ctx,
 
 lldb::ValueObjectSP RustStringLiteral::Evaluate(ExecutionContext &exe_ctx,
                                                 Status &error) {
-  RustASTContext *ast = GetASTContext(exe_ctx, error);
+  TypeSystemRust *ast = GetASTContext(exe_ctx, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -752,7 +753,7 @@ lldb::ValueObjectSP RustAndAndExpression::Evaluate(ExecutionContext &exe_ctx,
     return vleft;
   }
 
-  if (RustASTContext *ast = GetASTContext(vleft, error)) {
+  if (TypeSystemRust *ast = GetASTContext(vleft, error)) {
     CompilerType type = vleft->GetCompilerType();
     if (!ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a boolean type");
@@ -787,7 +788,7 @@ lldb::ValueObjectSP RustOrOrExpression::Evaluate(ExecutionContext &exe_ctx,
     return vleft;
   }
 
-  if (RustASTContext *ast = GetASTContext(vleft, error)) {
+  if (TypeSystemRust *ast = GetASTContext(vleft, error)) {
     CompilerType type = vleft->GetCompilerType();
     if (!ast->IsBooleanType(type.GetOpaqueQualType())) {
       error.SetErrorString("not a boolean type");
@@ -911,7 +912,7 @@ lldb::ValueObjectSP RustArrayWithLength::Evaluate(ExecutionContext &exe_ctx,
     return ValueObjectSP();
   }
 
-  RustASTContext *ast = GetASTContext(value, error);
+  TypeSystemRust *ast = GetASTContext(value, error);
   if (!ast) {
     return ValueObjectSP();
   }
@@ -961,7 +962,7 @@ lldb::ValueObjectSP RustCall::MaybeEvalTupleStruct(ExecutionContext &exe_ctx,
 
   // After this point, all errors are real.
 
-  RustASTContext *context = GetASTContext(type, error);
+  TypeSystemRust *context = GetASTContext(type, error);
   if (!context) {
     return ValueObjectSP();
   }
@@ -1117,7 +1118,7 @@ lldb::ValueObjectSP RustStructExpression::Evaluate(ExecutionContext &exe_ctx,
   if (!type) {
     return ValueObjectSP();
   }
-  RustASTContext *context = GetASTContext(type, error);
+  TypeSystemRust *context = GetASTContext(type, error);
   if (!context) {
     return ValueObjectSP();
   }
@@ -1243,7 +1244,7 @@ lldb::ValueObjectSP RustRangeExpression::Evaluate(ExecutionContext &exe_ctx,
 
 CompilerType RustArrayTypeExpression::Evaluate(ExecutionContext &exe_ctx,
                                                Status &error) {
-  RustASTContext *context = GetASTContext(exe_ctx, error);
+  TypeSystemRust *context = GetASTContext(exe_ctx, error);
   if (!context) {
     return CompilerType();
   }
@@ -1274,7 +1275,7 @@ CompilerType RustSliceTypeExpression::Evaluate(ExecutionContext &exe_ctx,
 
 CompilerType RustFunctionTypeExpression::Evaluate(ExecutionContext &exe_ctx,
                                                   Status &error) {
-  RustASTContext *context = GetASTContext(exe_ctx, error);
+  TypeSystemRust *context = GetASTContext(exe_ctx, error);
   if (!context) {
     return CompilerType();
   }
