@@ -1,4 +1,4 @@
-//===-- RustASTContext.cpp --------------------------------------*- C++ -*-===//
+//===-- TypeSystemRust.cpp --------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "TypeSystemRust.h"
 #include "lldb/Core/DumpDataExtractor.h"
 #include "lldb/Core/Module.h"
 #include "lldb/Core/PluginManager.h"
@@ -20,12 +21,10 @@
 #include "lldb/DataFormatters/StringPrinter.h"
 #include "lldb/Symbol/CompilerType.h"
 #include "lldb/Symbol/ObjectFile.h"
-#include "lldb/Symbol/RustASTContext.h"
 #include "lldb/Symbol/SymbolFile.h"
 #include "lldb/Symbol/Type.h"
 #include "lldb/Target/ExecutionContext.h"
 #include "lldb/Target/Target.h"
-
 #include "llvm/Support/Threading.h"
 
 #include "Plugins/ExpressionParser/Rust/RustUserExpression.h"
@@ -34,6 +33,8 @@
 #include <unordered_map>
 
 using namespace lldb;
+
+LLDB_PLUGIN_DEFINE(TypeSystemRust)
 
 namespace lldb_private {
 
@@ -64,7 +65,7 @@ public:
   virtual lldb::Format Format() const { return eFormatBytes; }
 
   virtual std::string
-  GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                          const std::string &varname) = 0;
 
   virtual uint32_t TypeInfo(CompilerType *element_type) const = 0;
@@ -109,7 +110,7 @@ public:
 
   uint64_t ByteSize() const override { return 1; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     return "bool " + varname;
   }
@@ -148,7 +149,7 @@ public:
 
   lldb::TypeClass TypeClass() const override { return eTypeClassBuiltin; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     // These names are predefined by clang.
     std::string result = "__";
@@ -203,7 +204,7 @@ public:
     return true;
   }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     RustType *type = (RustType *)m_underlying_type.GetOpaqueQualType();
     return type->GetCABITypeDeclaration(name_map, varname);
@@ -234,7 +235,7 @@ public:
 
   uint64_t ByteSize() const override { return m_byte_size; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     return (m_byte_size == 4 ? "float " : "double ") + varname;
   }
@@ -269,7 +270,7 @@ public:
 
   uint64_t ByteSize() const override { return m_byte_size; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     RustType *p_type = (RustType *)m_pointee.GetOpaqueQualType();
     if (p_type->AsFunction()) {
@@ -309,7 +310,7 @@ public:
     return m_elem.GetByteSize(nullptr).getValueOr(0) * m_length;
   }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     RustType *type = (RustType *)m_elem.GetOpaqueQualType();
     return type->GetCABITypeDeclaration(name_map, varname) + "[" +
@@ -407,7 +408,7 @@ public:
 
 protected:
   std::string
-  GetFieldsCABITypeDeclaration(RustASTContext::TypeNameMap *name_map) {
+  GetFieldsCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map) {
     int argno = 0;
     std::string result;
     for (const Field &f : m_fields) {
@@ -460,7 +461,7 @@ public:
   const char *Opener() const override { return "("; }
   const char *Closer() const override { return ")"; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     std::string tagname;
     if (name_map->Tag(this, &tagname)) {
@@ -504,7 +505,7 @@ public:
   const char *Opener() const override { return "{"; }
   const char *Closer() const override { return "}"; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     std::string tagname;
     if (name_map->Tag(this, &tagname)) {
@@ -528,7 +529,7 @@ public:
   const char *Opener() const override { return "{"; }
   const char *Closer() const override { return "}"; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     std::string tagname;
     if (name_map->Tag(this, &tagname)) {
@@ -596,7 +597,7 @@ public:
     }
   }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     std::string tagname;
     if (name_map->Tag(this, &tagname)) {
@@ -661,7 +662,7 @@ public:
 
   uint64_t ByteSize() const override { return m_byte_size; }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     RustType *type = (RustType *)m_return_type.GetOpaqueQualType();
 
@@ -712,7 +713,7 @@ public:
     return m_type.GetByteSize(nullptr).getValueOr(0);
   }
 
-  std::string GetCABITypeDeclaration(RustASTContext::TypeNameMap *name_map,
+  std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
                                      const std::string &varname) override {
     RustType *type = (RustType *)m_type.GetOpaqueQualType();
     return type->GetCABITypeDeclaration(name_map, varname);
@@ -810,39 +811,39 @@ private:
 } // namespace lldb_private
 using namespace lldb_private;
 
-char RustASTContext::ID;
+char TypeSystemRust::ID;
 
-RustASTContext::RustASTContext() : m_pointer_byte_size(0) {}
+TypeSystemRust::TypeSystemRust() : m_pointer_byte_size(0) {}
 
-RustASTContext::~RustASTContext() {}
+TypeSystemRust::~TypeSystemRust() {}
 
 //------------------------------------------------------------------
 // PluginInterface functions
 //------------------------------------------------------------------
 
-ConstString RustASTContext::GetPluginNameStatic() {
+ConstString TypeSystemRust::GetPluginNameStatic() {
   return ConstString("rust");
 }
 
-ConstString RustASTContext::GetPluginName() {
-  return RustASTContext::GetPluginNameStatic();
+ConstString TypeSystemRust::GetPluginName() {
+  return TypeSystemRust::GetPluginNameStatic();
 }
 
-uint32_t RustASTContext::GetPluginVersion() { return 1; }
+uint32_t TypeSystemRust::GetPluginVersion() { return 1; }
 
-lldb::TypeSystemSP RustASTContext::CreateInstance(lldb::LanguageType language,
+lldb::TypeSystemSP TypeSystemRust::CreateInstance(lldb::LanguageType language,
                                                   Module *module,
                                                   Target *target) {
   if (language == eLanguageTypeRust) {
     ArchSpec arch;
-    std::shared_ptr<RustASTContext> astc;
+    std::shared_ptr<TypeSystemRust> astc;
     if (module) {
       arch = module->GetArchitecture();
-      astc = std::shared_ptr<RustASTContext>(new RustASTContext);
+      astc = std::shared_ptr<TypeSystemRust>(new TypeSystemRust);
     } else if (target) {
       arch = target->GetArchitecture();
-      astc = std::shared_ptr<RustASTContextForExpr>(
-          new RustASTContextForExpr(target->shared_from_this()));
+      astc = std::shared_ptr<TypeSystemRustForExpr>(
+          new TypeSystemRustForExpr(target->shared_from_this()));
     }
 
     if (arch.IsValid()) {
@@ -853,7 +854,7 @@ lldb::TypeSystemSP RustASTContext::CreateInstance(lldb::LanguageType language,
   return lldb::TypeSystemSP();
 }
 
-void RustASTContext::Initialize() {
+void TypeSystemRust::Initialize() {
   LanguageSet supported_languages_for_types;
   supported_languages_for_types.Insert(lldb::eLanguageTypeRust);
   LanguageSet supported_languages_for_expressions;
@@ -862,7 +863,7 @@ void RustASTContext::Initialize() {
       supported_languages_for_types, supported_languages_for_expressions);
 }
 
-void RustASTContext::Terminate() {
+void TypeSystemRust::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
@@ -870,7 +871,13 @@ void RustASTContext::Terminate() {
 // Tests
 //----------------------------------------------------------------------
 
-bool RustASTContext::IsArrayType(lldb::opaque_compiler_type_t type,
+#ifndef NDEBUG
+bool TypeSystemRust::Verify(lldb::opaque_compiler_type_t type) {
+  return true;
+}
+#endif
+
+bool TypeSystemRust::IsArrayType(lldb::opaque_compiler_type_t type,
                                  CompilerType *element_type, uint64_t *size,
                                  bool *is_incomplete) {
   if (element_type)
@@ -890,7 +897,7 @@ bool RustASTContext::IsArrayType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool RustASTContext::IsVectorType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsVectorType(lldb::opaque_compiler_type_t type,
                                   CompilerType *element_type, uint64_t *size) {
   if (element_type)
     element_type->Clear();
@@ -899,36 +906,36 @@ bool RustASTContext::IsVectorType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool RustASTContext::IsAggregateType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsAggregateType(lldb::opaque_compiler_type_t type) {
   return static_cast<RustType *>(type)->IsAggregateType();
 }
 
-bool RustASTContext::IsBeingDefined(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsBeingDefined(lldb::opaque_compiler_type_t type) {
   return false;
 }
 
-bool RustASTContext::IsCharType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsCharType(lldb::opaque_compiler_type_t type) {
   return static_cast<RustType *>(type)->IsCharType();
 }
 
-bool RustASTContext::IsCompleteType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsCompleteType(lldb::opaque_compiler_type_t type) {
   return bool(type);
 }
 
-bool RustASTContext::IsConst(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsConst(lldb::opaque_compiler_type_t type) {
   return false;
 }
 
-bool RustASTContext::IsCStringType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsCStringType(lldb::opaque_compiler_type_t type,
                                    uint32_t &length) {
   return false;
 }
 
-bool RustASTContext::IsDefined(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsDefined(lldb::opaque_compiler_type_t type) {
   return type != nullptr;
 }
 
-bool RustASTContext::IsFloatingPointType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsFloatingPointType(lldb::opaque_compiler_type_t type,
                                          uint32_t &count, bool &is_complex) {
   is_complex = false;
   if (static_cast<RustType *>(type)->IsFloatType()) {
@@ -939,7 +946,7 @@ bool RustASTContext::IsFloatingPointType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool RustASTContext::IsFunctionType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsFunctionType(lldb::opaque_compiler_type_t type,
                                     bool *is_variadic_ptr) {
   if (is_variadic_ptr)
     *is_variadic_ptr = false;
@@ -947,13 +954,13 @@ bool RustASTContext::IsFunctionType(lldb::opaque_compiler_type_t type,
 }
 
 uint32_t
-RustASTContext::IsHomogeneousAggregate(lldb::opaque_compiler_type_t type,
+TypeSystemRust::IsHomogeneousAggregate(lldb::opaque_compiler_type_t type,
                                        CompilerType *base_type_ptr) {
   // FIXME should detect "homogeneous floating-point aggregates".
   return false;
 }
 
-size_t RustASTContext::GetNumberOfFunctionArguments(
+size_t TypeSystemRust::GetNumberOfFunctionArguments(
     lldb::opaque_compiler_type_t type) {
   RustFunction *func = static_cast<RustType *>(type)->AsFunction();
   if (func) {
@@ -963,7 +970,7 @@ size_t RustASTContext::GetNumberOfFunctionArguments(
 }
 
 CompilerType
-RustASTContext::GetFunctionArgumentAtIndex(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetFunctionArgumentAtIndex(lldb::opaque_compiler_type_t type,
                                            const size_t index) {
   RustFunction *func = static_cast<RustType *>(type)->AsFunction();
   if (func) {
@@ -972,7 +979,7 @@ RustASTContext::GetFunctionArgumentAtIndex(lldb::opaque_compiler_type_t type,
   return CompilerType();
 }
 
-bool RustASTContext::IsFunctionPointerType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsFunctionPointerType(lldb::opaque_compiler_type_t type) {
   CompilerType pointee;
   if (!IsPointerType(type, &pointee)) {
     return false;
@@ -980,13 +987,13 @@ bool RustASTContext::IsFunctionPointerType(lldb::opaque_compiler_type_t type) {
   return pointee.IsFunctionType();
 }
 
-bool RustASTContext::IsBlockPointerType(
+bool TypeSystemRust::IsBlockPointerType(
     lldb::opaque_compiler_type_t type,
     CompilerType *function_pointer_type_ptr) {
   return false;
 }
 
-bool RustASTContext::IsIntegerType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsIntegerType(lldb::opaque_compiler_type_t type,
                                    bool &is_signed) {
   if (!type)
     return false;
@@ -999,11 +1006,11 @@ bool RustASTContext::IsIntegerType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool RustASTContext::IsPolymorphicClass(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsPolymorphicClass(lldb::opaque_compiler_type_t type) {
   return false;
 }
 
-bool RustASTContext::IsPossibleDynamicType(
+bool TypeSystemRust::IsPossibleDynamicType(
     lldb::opaque_compiler_type_t type,
     CompilerType *target_type, // Can pass NULL
     bool check_cplusplus, bool check_objc) {
@@ -1016,11 +1023,11 @@ bool RustASTContext::IsPossibleDynamicType(
   return false;
 }
 
-bool RustASTContext::IsRuntimeGeneratedType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsRuntimeGeneratedType(lldb::opaque_compiler_type_t type) {
   return false;
 }
 
-bool RustASTContext::IsPointerType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsPointerType(lldb::opaque_compiler_type_t type,
                                    CompilerType *pointee_type) {
   if (!type)
     return false;
@@ -1032,34 +1039,34 @@ bool RustASTContext::IsPointerType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool RustASTContext::IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
                                               CompilerType *pointee_type) {
   return IsPointerType(type, pointee_type);
 }
 
-bool RustASTContext::IsReferenceType(lldb::opaque_compiler_type_t type,
+bool TypeSystemRust::IsReferenceType(lldb::opaque_compiler_type_t type,
                                      CompilerType *pointee_type,
                                      bool *is_rvalue) {
   return false;
 }
 
-bool RustASTContext::IsScalarType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsScalarType(lldb::opaque_compiler_type_t type) {
   return !IsAggregateType(type);
 }
 
-bool RustASTContext::IsTypedefType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsTypedefType(lldb::opaque_compiler_type_t type) {
   if (type)
     return static_cast<RustType *>(type)->AsTypedef() != nullptr;
   return false;
 }
 
-bool RustASTContext::IsBooleanType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsBooleanType(lldb::opaque_compiler_type_t type) {
   if (type)
     return static_cast<RustType *>(type)->AsBool() != nullptr;
   return false;
 }
 
-bool RustASTContext::IsVoidType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsVoidType(lldb::opaque_compiler_type_t type) {
   if (!type)
     return false;
   RustTuple *tuple = static_cast<RustType *>(type)->AsTuple();
@@ -1068,12 +1075,12 @@ bool RustASTContext::IsVoidType(lldb::opaque_compiler_type_t type) {
          tuple->FieldCount() == 0;
 }
 
-bool RustASTContext::CanPassInRegisters(const CompilerType &type) {
+bool TypeSystemRust::CanPassInRegisters(const CompilerType &type) {
   // Rust does not have the exception for types with "non-trivial" constructors.
   return true;
 }
 
-bool RustASTContext::SupportsLanguage(lldb::LanguageType language) {
+bool TypeSystemRust::SupportsLanguage(lldb::LanguageType language) {
   return language == eLanguageTypeRust;
 }
 
@@ -1081,7 +1088,7 @@ bool RustASTContext::SupportsLanguage(lldb::LanguageType language) {
 // Type Completion
 //----------------------------------------------------------------------
 
-bool RustASTContext::GetCompleteType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::GetCompleteType(lldb::opaque_compiler_type_t type) {
   return bool(type);
 }
 
@@ -1089,25 +1096,25 @@ bool RustASTContext::GetCompleteType(lldb::opaque_compiler_type_t type) {
 // AST related queries
 //----------------------------------------------------------------------
 
-uint32_t RustASTContext::GetPointerByteSize() { return m_pointer_byte_size; }
+uint32_t TypeSystemRust::GetPointerByteSize() { return m_pointer_byte_size; }
 
 //----------------------------------------------------------------------
 // Accessors
 //----------------------------------------------------------------------
 
-ConstString RustASTContext::GetTypeName(lldb::opaque_compiler_type_t type) {
+ConstString TypeSystemRust::GetTypeName(lldb::opaque_compiler_type_t type) {
   if (type)
     return static_cast<RustType *>(type)->Name();
   return ConstString();
 }
 
 ConstString
-RustASTContext::GetDisplayTypeName(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetDisplayTypeName(lldb::opaque_compiler_type_t type) {
   return GetTypeName(type);
 }
 
 uint32_t
-RustASTContext::GetTypeInfo(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetTypeInfo(lldb::opaque_compiler_type_t type,
                             CompilerType *pointee_or_element_compiler_type) {
   if (pointee_or_element_compiler_type)
     pointee_or_element_compiler_type->Clear();
@@ -1118,14 +1125,14 @@ RustASTContext::GetTypeInfo(lldb::opaque_compiler_type_t type,
 }
 
 lldb::TypeClass
-RustASTContext::GetTypeClass(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetTypeClass(lldb::opaque_compiler_type_t type) {
   if (!type)
     return eTypeClassInvalid;
   return static_cast<RustType *>(type)->TypeClass();
 }
 
 lldb::BasicType
-RustASTContext::GetBasicTypeEnumeration(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetBasicTypeEnumeration(lldb::opaque_compiler_type_t type) {
   if (!type)
     return eBasicTypeInvalid;
 
@@ -1160,11 +1167,11 @@ RustASTContext::GetBasicTypeEnumeration(lldb::opaque_compiler_type_t type) {
 }
 
 lldb::LanguageType
-RustASTContext::GetMinimumLanguage(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetMinimumLanguage(lldb::opaque_compiler_type_t type) {
   return lldb::eLanguageTypeRust;
 }
 
-unsigned RustASTContext::GetTypeQualifiers(lldb::opaque_compiler_type_t type) {
+unsigned TypeSystemRust::GetTypeQualifiers(lldb::opaque_compiler_type_t type) {
   return 0;
 }
 
@@ -1173,7 +1180,7 @@ unsigned RustASTContext::GetTypeQualifiers(lldb::opaque_compiler_type_t type) {
 //----------------------------------------------------------------------
 
 CompilerType
-RustASTContext::GetArrayElementType(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetArrayElementType(lldb::opaque_compiler_type_t type,
                                     uint64_t *stride) {
   RustArray *array = static_cast<RustType *>(type)->AsArray();
   if (array) {
@@ -1185,7 +1192,7 @@ RustASTContext::GetArrayElementType(lldb::opaque_compiler_type_t type,
   return CompilerType();
 }
 
-CompilerType RustASTContext::GetArrayType(lldb::opaque_compiler_type_t type,
+CompilerType TypeSystemRust::GetArrayType(lldb::opaque_compiler_type_t type,
                                           uint64_t size) {
   if (type) {
     return CreateArrayType(CompilerType(this, type), size);
@@ -1194,7 +1201,7 @@ CompilerType RustASTContext::GetArrayType(lldb::opaque_compiler_type_t type,
 }
 
 CompilerType
-RustASTContext::GetCanonicalType(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetCanonicalType(lldb::opaque_compiler_type_t type) {
   RustTypedef *t = static_cast<RustType *>(type)->AsTypedef();
   if (t)
     return t->UnderlyingType();
@@ -1202,25 +1209,25 @@ RustASTContext::GetCanonicalType(lldb::opaque_compiler_type_t type) {
 }
 
 CompilerType
-RustASTContext::GetFullyUnqualifiedType(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetFullyUnqualifiedType(lldb::opaque_compiler_type_t type) {
   return CompilerType(this, type);
 }
 
 // Returns -1 if this isn't a function or if the function doesn't have a
 // prototype.
 // Returns a value >= 0 if there is a prototype.
-int RustASTContext::GetFunctionArgumentCount(
+int TypeSystemRust::GetFunctionArgumentCount(
     lldb::opaque_compiler_type_t type) {
   return GetNumberOfFunctionArguments(type);
 }
 
-CompilerType RustASTContext::GetFunctionArgumentTypeAtIndex(
+CompilerType TypeSystemRust::GetFunctionArgumentTypeAtIndex(
     lldb::opaque_compiler_type_t type, size_t idx) {
   return GetFunctionArgumentAtIndex(type, idx);
 }
 
 CompilerType
-RustASTContext::GetFunctionReturnType(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetFunctionReturnType(lldb::opaque_compiler_type_t type) {
   if (type) {
     RustFunction *t = static_cast<RustType *>(type)->AsFunction();
     if (t) {
@@ -1231,22 +1238,22 @@ RustASTContext::GetFunctionReturnType(lldb::opaque_compiler_type_t type) {
 }
 
 size_t
-RustASTContext::GetNumMemberFunctions(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetNumMemberFunctions(lldb::opaque_compiler_type_t type) {
   return 0;
 }
 
 TypeMemberFunctionImpl
-RustASTContext::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
                                          size_t idx) {
   return TypeMemberFunctionImpl();
 }
 
 CompilerType
-RustASTContext::GetNonReferenceType(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetNonReferenceType(lldb::opaque_compiler_type_t type) {
   return CompilerType(this, type);
 }
 
-CompilerType RustASTContext::GetPointeeType(lldb::opaque_compiler_type_t type) {
+CompilerType TypeSystemRust::GetPointeeType(lldb::opaque_compiler_type_t type) {
   if (!type)
     return CompilerType();
   RustPointer *p = static_cast<RustType *>(type)->AsPointer();
@@ -1255,7 +1262,7 @@ CompilerType RustASTContext::GetPointeeType(lldb::opaque_compiler_type_t type) {
   return CompilerType();
 }
 
-CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
+CompilerType TypeSystemRust::GetPointerType(lldb::opaque_compiler_type_t type) {
   ConstString type_name = GetTypeName(type);
   // Arbitrarily look for a raw pointer here.
   ConstString pointer_name(std::string("*mut ") + type_name.GetCString());
@@ -1265,7 +1272,7 @@ CompilerType RustASTContext::GetPointerType(lldb::opaque_compiler_type_t type) {
 
 // If the current object represents a typedef type, get the underlying type
 CompilerType
-RustASTContext::GetTypedefedType(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetTypedefedType(lldb::opaque_compiler_type_t type) {
   if (type) {
     RustTypedef *t = static_cast<RustType *>(type)->AsTypedef();
     if (t)
@@ -1277,12 +1284,12 @@ RustASTContext::GetTypedefedType(lldb::opaque_compiler_type_t type) {
 //----------------------------------------------------------------------
 // Create related types using the current type's AST
 //----------------------------------------------------------------------
-CompilerType RustASTContext::GetBasicTypeFromAST(lldb::BasicType basic_type) {
+CompilerType TypeSystemRust::GetBasicTypeFromAST(lldb::BasicType basic_type) {
   return CompilerType();
 }
 
 CompilerType
-RustASTContext::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
+TypeSystemRust::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
                                                     size_t bit_size) {
   return CompilerType();
 }
@@ -1292,7 +1299,7 @@ RustASTContext::GetBuiltinTypeForEncodingAndBitSize(lldb::Encoding encoding,
 //----------------------------------------------------------------------
 
 const llvm::fltSemantics &
-RustASTContext::GetFloatTypeSemantics(size_t byte_size) {
+TypeSystemRust::GetFloatTypeSemantics(size_t byte_size) {
   switch (byte_size) {
   case 2:
     return llvm::APFloatBase::IEEEhalf();
@@ -1308,7 +1315,7 @@ RustASTContext::GetFloatTypeSemantics(size_t byte_size) {
 }
 
 llvm::Optional<uint64_t>
-RustASTContext::GetBitSize(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetBitSize(lldb::opaque_compiler_type_t type,
                            ExecutionContextScope *exe_scope) {
   if (!type)
     return {};
@@ -1316,7 +1323,7 @@ RustASTContext::GetBitSize(lldb::opaque_compiler_type_t type,
   return t->ByteSize() * 8;
 }
 
-lldb::Encoding RustASTContext::GetEncoding(lldb::opaque_compiler_type_t type,
+lldb::Encoding TypeSystemRust::GetEncoding(lldb::opaque_compiler_type_t type,
                                            uint64_t &count) {
   count = 1;
   bool is_signed;
@@ -1337,19 +1344,19 @@ lldb::Encoding RustASTContext::GetEncoding(lldb::opaque_compiler_type_t type,
   return eEncodingInvalid;
 }
 
-lldb::Format RustASTContext::GetFormat(lldb::opaque_compiler_type_t type) {
+lldb::Format TypeSystemRust::GetFormat(lldb::opaque_compiler_type_t type) {
   if (!type)
     return eFormatDefault;
   return static_cast<RustType *>(type)->Format();
 }
 
 llvm::Optional<size_t>
-RustASTContext::GetTypeBitAlign(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetTypeBitAlign(lldb::opaque_compiler_type_t type,
                                 ExecutionContextScope *exe_scope) {
   return {};
 }
 
-uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
+uint32_t TypeSystemRust::GetNumChildren(lldb::opaque_compiler_type_t type,
                                         bool omit_empty_base_classes,
                                         const ExecutionContext *exe_ctx) {
   if (!type)
@@ -1376,7 +1383,7 @@ uint32_t RustASTContext::GetNumChildren(lldb::opaque_compiler_type_t type,
   return result;
 }
 
-uint32_t RustASTContext::GetNumFields(lldb::opaque_compiler_type_t type) {
+uint32_t TypeSystemRust::GetNumFields(lldb::opaque_compiler_type_t type) {
   if (!type)
     return 0;
   RustType *t = static_cast<RustType *>(type);
@@ -1387,7 +1394,7 @@ uint32_t RustASTContext::GetNumFields(lldb::opaque_compiler_type_t type) {
   return 0;
 }
 
-CompilerType RustASTContext::GetFieldAtIndex(lldb::opaque_compiler_type_t type,
+CompilerType TypeSystemRust::GetFieldAtIndex(lldb::opaque_compiler_type_t type,
                                              size_t idx, std::string &name,
                                              uint64_t *bit_offset_ptr,
                                              uint32_t *bitfield_bit_size_ptr,
@@ -1419,7 +1426,7 @@ CompilerType RustASTContext::GetFieldAtIndex(lldb::opaque_compiler_type_t type,
   return CompilerType();
 }
 
-CompilerType RustASTContext::GetChildCompilerTypeAtIndex(
+CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
     lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx, size_t idx,
     bool transparent_pointers, bool omit_empty_base_classes,
     bool ignore_array_bounds, std::string &child_name,
@@ -1511,7 +1518,7 @@ CompilerType RustASTContext::GetChildCompilerTypeAtIndex(
 // Lookup a child given a name. This function will match base class names
 // and member member names in "clang_type" only, not descendants.
 uint32_t
-RustASTContext::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
                                         const char *name,
                                         bool omit_empty_base_classes) {
   if (!type || !GetCompleteType(type))
@@ -1537,7 +1544,7 @@ RustASTContext::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
 // TODO: Return all matches for a given name by returning a
 // vector<vector<uint32_t>>
 // so we catch all names that match a given child name, not just the first.
-size_t RustASTContext::GetIndexOfChildMemberWithName(
+size_t TypeSystemRust::GetIndexOfChildMemberWithName(
     lldb::opaque_compiler_type_t type, const char *name,
     bool omit_empty_base_classes, std::vector<uint32_t> &child_indexes) {
   uint32_t index = GetIndexOfChildWithName(type, name, omit_empty_base_classes);
@@ -1552,7 +1559,7 @@ size_t RustASTContext::GetIndexOfChildMemberWithName(
 //----------------------------------------------------------------------
 #define DEPTH_INCREMENT 2
 
-void RustASTContext::DumpValue(
+void TypeSystemRust::DumpValue(
     lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx, Stream *s,
     lldb::Format format, const DataExtractor &data,
     lldb::offset_t data_byte_offset, size_t data_byte_size,
@@ -1562,7 +1569,7 @@ void RustASTContext::DumpValue(
   assert(false && "Not implemented");
 }
 
-bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
+bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
                                    lldb::Format format,
                                    const DataExtractor &data,
                                    lldb::offset_t byte_offset, size_t byte_size,
@@ -1714,7 +1721,7 @@ bool RustASTContext::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
   return 0;
 }
 
-void RustASTContext::DumpSummary(lldb::opaque_compiler_type_t type,
+void TypeSystemRust::DumpSummary(lldb::opaque_compiler_type_t type,
                                  ExecutionContext *exe_ctx, Stream *s,
                                  const DataExtractor &data,
                                  lldb::offset_t data_offset,
@@ -1722,14 +1729,14 @@ void RustASTContext::DumpSummary(lldb::opaque_compiler_type_t type,
   // Apparently there is nothing to do here.
 }
 
-void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type,
+void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
                                          lldb::DescriptionLevel level) {
   // Dump to stdout
   StreamFile s(stdout, false);
   DumpTypeDescription(type, &s);
 }
 
-void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type,
+void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
                                          Stream *s,
                                          lldb::DescriptionLevel level) {
   if (!type)
@@ -1775,26 +1782,26 @@ void RustASTContext::DumpTypeDescription(lldb::opaque_compiler_type_t type,
   s->PutCString(name.AsCString());
 }
 
-CompilerType RustASTContext::CacheType(RustType *new_type) {
+CompilerType TypeSystemRust::CacheType(RustType *new_type) {
   m_types.insert(std::unique_ptr<RustType>(new_type));
   return CompilerType(this, new_type);
 }
 
 CompilerType
-RustASTContext::CreateBoolType(const lldb_private::ConstString &name) {
+TypeSystemRust::CreateBoolType(const lldb_private::ConstString &name) {
   RustType *type = new RustBool(name);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreateIntegralType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateIntegralType(const lldb_private::ConstString &name,
                                    bool is_signed, uint64_t byte_size,
                                    bool is_char_type) {
   RustType *type = new RustIntegral(name, is_signed, byte_size, is_char_type);
   return CacheType(type);
 }
 
-CompilerType RustASTContext::CreateIntrinsicIntegralType(bool is_signed,
+CompilerType TypeSystemRust::CreateIntrinsicIntegralType(bool is_signed,
                                                          uint64_t byte_size) {
   char name[100];
   snprintf(name, sizeof(name), "%s%d", is_signed ? "i" : "u",
@@ -1804,19 +1811,19 @@ CompilerType RustASTContext::CreateIntrinsicIntegralType(bool is_signed,
   return CreateIntegralType(cname, is_signed, byte_size);
 }
 
-CompilerType RustASTContext::CreateCharType() {
+CompilerType TypeSystemRust::CreateCharType() {
   ConstString cname("char");
   return CreateIntegralType(cname, false, 4, true);
 }
 
 CompilerType
-RustASTContext::CreateFloatType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateFloatType(const lldb_private::ConstString &name,
                                 uint64_t byte_size) {
   RustType *type = new RustFloat(name, byte_size);
   return CacheType(type);
 }
 
-CompilerType RustASTContext::CreateArrayType(const CompilerType &element_type,
+CompilerType TypeSystemRust::CreateArrayType(const CompilerType &element_type,
                                              uint64_t length) {
   std::string name = std::string("[") + element_type.GetTypeName().AsCString();
   if (length != 0) {
@@ -1829,50 +1836,50 @@ CompilerType RustASTContext::CreateArrayType(const CompilerType &element_type,
   return CacheType(type);
 }
 
-CompilerType RustASTContext::CreateTypedefType(const ConstString &name,
+CompilerType TypeSystemRust::CreateTypedefType(const ConstString &name,
                                                CompilerType impl) {
   RustType *type = new RustTypedef(name, impl);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreateStructType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateStructType(const lldb_private::ConstString &name,
                                  uint32_t byte_size, bool has_discriminant) {
   RustType *type = new RustStruct(name, byte_size, has_discriminant);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreateTupleType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateTupleType(const lldb_private::ConstString &name,
                                 uint32_t byte_size, bool has_discriminant) {
   RustType *type = new RustTuple(name, byte_size, has_discriminant);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreateUnionType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateUnionType(const lldb_private::ConstString &name,
                                 uint32_t byte_size) {
   RustType *type = new RustUnion(name, byte_size);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreatePointerType(const lldb_private::ConstString &name,
+TypeSystemRust::CreatePointerType(const lldb_private::ConstString &name,
                                   const CompilerType &pointee_type,
                                   uint32_t byte_size) {
   RustType *type = new RustPointer(name, pointee_type, byte_size);
   return CacheType(type);
 }
 
-void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
+void TypeSystemRust::AddFieldToStruct(const CompilerType &struct_type,
                                       const lldb_private::ConstString &name,
                                       const CompilerType &field_type,
                                       uint32_t byte_offset, bool is_default,
                                       uint64_t discriminant) {
   if (!struct_type)
     return;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(struct_type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(struct_type.GetTypeSystem());
   if (!ast)
     return;
   RustType *type = static_cast<RustType *>(struct_type.GetOpaqueQualType());
@@ -1884,7 +1891,7 @@ void RustASTContext::AddFieldToStruct(const CompilerType &struct_type,
   }
 }
 
-CompilerType RustASTContext::CreateFunctionType(
+CompilerType TypeSystemRust::CreateFunctionType(
     const lldb_private::ConstString &name, const CompilerType &return_type,
     const std::vector<CompilerType> &&params,
     const std::vector<CompilerType> &&template_params) {
@@ -1894,14 +1901,14 @@ CompilerType RustASTContext::CreateFunctionType(
   return CacheType(type);
 }
 
-CompilerType RustASTContext::CreateVoidType() {
+CompilerType TypeSystemRust::CreateVoidType() {
   ConstString name("()");
   RustType *type = new RustTuple(name, 0, false);
   return CacheType(type);
 }
 
 CompilerType
-RustASTContext::CreateEnumType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateEnumType(const lldb_private::ConstString &name,
                                uint64_t byte_size, uint32_t discr_offset,
                                uint32_t discr_byte_size) {
   RustType *type = new RustEnum(name, byte_size, discr_offset, discr_byte_size);
@@ -1909,29 +1916,29 @@ RustASTContext::CreateEnumType(const lldb_private::ConstString &name,
 }
 
 CompilerType
-RustASTContext::CreateCLikeEnumType(const lldb_private::ConstString &name,
+TypeSystemRust::CreateCLikeEnumType(const lldb_private::ConstString &name,
                                     const CompilerType &underlying_type,
                                     std::map<uint64_t, std::string> &&values) {
   RustType *type = new RustCLikeEnum(name, underlying_type, std::move(values));
   return CacheType(type);
 }
 
-bool RustASTContext::IsTupleType(const CompilerType &type) {
+bool TypeSystemRust::IsTupleType(const CompilerType &type) {
   if (!type)
     return false;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
   return bool(rtype->AsTuple());
 }
 
-bool RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
+bool TypeSystemRust::TypeHasDiscriminant(const CompilerType &type) {
   if (!type)
     return false;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1940,13 +1947,13 @@ bool RustASTContext::TypeHasDiscriminant(const CompilerType &type) {
   return false;
 }
 
-bool RustASTContext::GetEnumDiscriminantLocation(const CompilerType &type,
+bool TypeSystemRust::GetEnumDiscriminantLocation(const CompilerType &type,
                                                  uint64_t &discr_offset,
                                                  uint64_t &discr_byte_size) {
   if (!type)
     return false;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1957,12 +1964,12 @@ bool RustASTContext::GetEnumDiscriminantLocation(const CompilerType &type,
   return false;
 }
 
-CompilerType RustASTContext::FindEnumVariant(const CompilerType &type,
+CompilerType TypeSystemRust::FindEnumVariant(const CompilerType &type,
                                              uint64_t discriminant) {
   if (!type)
     return CompilerType();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return CompilerType();
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1972,11 +1979,11 @@ CompilerType RustASTContext::FindEnumVariant(const CompilerType &type,
   return CompilerType();
 }
 
-void RustASTContext::FinishAggregateInitialization(const CompilerType &type) {
+void TypeSystemRust::FinishAggregateInitialization(const CompilerType &type) {
   if (!type)
     return;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1984,13 +1991,13 @@ void RustASTContext::FinishAggregateInitialization(const CompilerType &type) {
     a->FinishInitialization();
 }
 
-DWARFASTParser *RustASTContext::GetDWARFParser() {
+DWARFASTParser *TypeSystemRust::GetDWARFParser() {
   if (!m_dwarf_ast_parser_ap)
     m_dwarf_ast_parser_ap.reset(new DWARFASTParserRust(*this));
   return m_dwarf_ast_parser_ap.get();
 }
 
-UserExpression *RustASTContextForExpr::GetUserExpression(
+UserExpression *TypeSystemRustForExpr::GetUserExpression(
     llvm::StringRef expr, llvm::StringRef prefix, lldb::LanguageType language,
     Expression::ResultType desired_type,
     const EvaluateExpressionOptions &options, ValueObject *ctx_obj) {
@@ -2001,51 +2008,51 @@ UserExpression *RustASTContextForExpr::GetUserExpression(
   return nullptr;
 }
 
-ConstString RustASTContext::DeclGetName(void *opaque_decl) {
+ConstString TypeSystemRust::DeclGetName(void *opaque_decl) {
   RustDecl *dc = (RustDecl *)opaque_decl;
   return dc->Name();
 }
 
-ConstString RustASTContext::DeclGetMangledName(void *opaque_decl) {
+ConstString TypeSystemRust::DeclGetMangledName(void *opaque_decl) {
   RustDecl *dc = (RustDecl *)opaque_decl;
   return dc->MangledName();
 }
 
-CompilerDeclContext RustASTContext::DeclGetDeclContext(void *opaque_decl) {
+CompilerDeclContext TypeSystemRust::DeclGetDeclContext(void *opaque_decl) {
   RustDecl *dc = (RustDecl *)opaque_decl;
   return CompilerDeclContext(this, dc->Context());
 }
 
-CompilerType RustASTContext::GetTypeForDecl(void *opaque_decl) {
+CompilerType TypeSystemRust::GetTypeForDecl(void *opaque_decl) {
   Host::SystemLog(Host::eSystemLogError,
-                  "error: need to implement RustASTContext::GetTypeForDecl\n");
+                  "error: need to implement TypeSystemRust::GetTypeForDecl\n");
   // RustDecl *dc = (RustDecl *) opaque_decl;
   return CompilerType();
 }
 
-ConstString RustASTContext::DeclContextGetName(void *opaque_decl_ctx) {
+ConstString TypeSystemRust::DeclContextGetName(void *opaque_decl_ctx) {
   RustDeclContext *dc = (RustDeclContext *)opaque_decl_ctx;
   return dc->Name();
 }
 
 ConstString
-RustASTContext::DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) {
+TypeSystemRust::DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) {
   RustDeclContext *dc = (RustDeclContext *)opaque_decl_ctx;
   return dc->QualifiedName();
 }
 
-bool RustASTContext::DeclContextIsClassMethod(
+bool TypeSystemRust::DeclContextIsClassMethod(
     void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
     bool *is_instance_method_ptr, ConstString *language_object_name_ptr) {
   return false;
 }
 
-bool RustASTContext::DeclContextIsContainedInLookup(
+bool TypeSystemRust::DeclContextIsContainedInLookup(
     void *opaque_decl_ctx, void *other_opaque_decl_ctx) {
   return opaque_decl_ctx == other_opaque_decl_ctx;
 }
 
-std::vector<CompilerDecl> RustASTContext::DeclContextFindDeclByName(
+std::vector<CompilerDecl> TypeSystemRust::DeclContextFindDeclByName(
     void *opaque_decl_ctx, ConstString name, const bool ignore_imported_decls) {
   std::vector<CompilerDecl> result;
   SymbolFile *symbol_file = GetSymbolFile();
@@ -2062,19 +2069,19 @@ std::vector<CompilerDecl> RustASTContext::DeclContextFindDeclByName(
   return result;
 }
 
-CompilerDeclContext RustASTContext::GetTranslationUnitDecl() {
+CompilerDeclContext TypeSystemRust::GetTranslationUnitDecl() {
   if (!m_tu_decl) {
     m_tu_decl.reset(new RustDeclContext(ConstString(""), nullptr));
   }
   return CompilerDeclContext(this, m_tu_decl.get());
 }
 
-CompilerDeclContext RustASTContext::GetNamespaceDecl(CompilerDeclContext parent,
+CompilerDeclContext TypeSystemRust::GetNamespaceDecl(CompilerDeclContext parent,
                                                      const ConstString &name) {
   if (!parent)
     return CompilerDeclContext();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(parent.GetTypeSystem());
   if (!ast)
     return CompilerDeclContext();
 
@@ -2092,11 +2099,11 @@ CompilerDeclContext RustASTContext::GetNamespaceDecl(CompilerDeclContext parent,
 }
 
 CompilerDeclContext
-RustASTContext::GetDeclContextDeclContext(CompilerDeclContext child) {
+TypeSystemRust::GetDeclContextDeclContext(CompilerDeclContext child) {
   if (!child)
     return CompilerDeclContext();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(child.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(child.GetTypeSystem());
   if (!ast)
     return CompilerDeclContext();
 
@@ -2104,13 +2111,13 @@ RustASTContext::GetDeclContextDeclContext(CompilerDeclContext child) {
   return CompilerDeclContext(this, dc->Context());
 }
 
-CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent,
+CompilerDecl TypeSystemRust::GetDecl(CompilerDeclContext parent,
                                      const ConstString &name,
                                      const ConstString &mangled) {
   if (!parent)
     return CompilerDecl();
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(parent.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(parent.GetTypeSystem());
   if (!ast)
     return CompilerDecl();
 
@@ -2127,13 +2134,13 @@ CompilerDecl RustASTContext::GetDecl(CompilerDeclContext parent,
   return CompilerDecl(this, new_ns);
 }
 
-bool RustASTContext::GetCABITypeDeclaration(
+bool TypeSystemRust::GetCABITypeDeclaration(
     CompilerType type, const std::string &varname,
-    RustASTContext::TypeNameMap *name_map, std::string *result) {
+    TypeSystemRust::TypeNameMap *name_map, std::string *result) {
   if (!type)
     return false;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -2142,7 +2149,7 @@ bool RustASTContext::GetCABITypeDeclaration(
 }
 
 CompilerType
-RustASTContext::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
+TypeSystemRust::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
                                         size_t idx) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
@@ -2156,7 +2163,7 @@ RustASTContext::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
 }
 
 size_t
-RustASTContext::GetNumTemplateArguments(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetNumTemplateArguments(lldb::opaque_compiler_type_t type) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {
@@ -2168,12 +2175,12 @@ RustASTContext::GetNumTemplateArguments(lldb::opaque_compiler_type_t type) {
   return 0;
 }
 
-void RustASTContext::AddTemplateParameter(const CompilerType &type,
+void TypeSystemRust::AddTemplateParameter(const CompilerType &type,
                                           const CompilerType &param) {
   if (!type)
     return;
-  RustASTContext *ast =
-      llvm::dyn_cast_or_null<RustASTContext>(type.GetTypeSystem());
+  TypeSystemRust *ast =
+      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
   if (!ast)
     return;
   RustType *t = static_cast<RustType *>(type.GetOpaqueQualType());
