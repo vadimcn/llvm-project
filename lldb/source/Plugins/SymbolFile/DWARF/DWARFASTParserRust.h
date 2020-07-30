@@ -26,14 +26,14 @@
 #include "DWARFDefines.h"
 #include "DWARFFormValue.h"
 #include "lldb/Core/PluginInterface.h"
-#include "lldb/Symbol/RustASTContext.h"
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 
 class DWARFDebugInfoEntry;
 class DWARFDIECollection;
 
 class DWARFASTParserRust : public DWARFASTParser {
 public:
-  DWARFASTParserRust(lldb_private::RustASTContext &ast) : m_ast(ast) {}
+  DWARFASTParserRust(lldb_private::TypeSystemRust &ast) : m_ast(ast) {}
 
   lldb::TypeSP ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
                                   const DWARFDIE &die,
@@ -98,7 +98,7 @@ private:
               bool &saw_discr,
               std::vector<lldb_private::CompilerType> &template_params);
 
-  lldb_private::RustASTContext &m_ast;
+  lldb_private::TypeSystemRust &m_ast;
 
   // The Rust compiler will emit a DW_TAG_enumeration_type for the
   // type of an enum discriminant.  However, this type will have the

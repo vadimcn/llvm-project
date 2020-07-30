@@ -1,4 +1,4 @@
-//===-- RustASTContext.h ----------------------------------------*- C++ -*-===//
+//===-- TypeSystemRust.h ----------------------------------------*- C++ -*-===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,8 +7,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef liblldb_RustASTContext_h_
-#define liblldb_RustASTContext_h_
+#ifndef liblldb_TypeSystemRust_h_
+#define liblldb_TypeSystemRust_h_
 
 // C Includes
 // C++ Includes
@@ -30,13 +30,13 @@ class RustDecl;
 class RustDeclContext;
 class RustType;
 
-class RustASTContext : public TypeSystem {
+class TypeSystemRust : public TypeSystem {
   // LLVM RTTI support
   static char ID;
 
 public:
-  RustASTContext();
-  ~RustASTContext() override;
+  TypeSystemRust();
+  ~TypeSystemRust() override;
 
   //------------------------------------------------------------------
   // PluginInterface functions
@@ -153,6 +153,10 @@ public:
   //----------------------------------------------------------------------
   // Tests
   //----------------------------------------------------------------------
+
+#ifndef NDEBUG
+  bool Verify(lldb::opaque_compiler_type_t type) override;
+#endif
 
   bool IsArrayType(lldb::opaque_compiler_type_t type,
                    CompilerType *element_type, uint64_t *size,
@@ -360,7 +364,7 @@ public:
   //----------------------------------------------------------------------
 #ifndef NDEBUG
   LLVM_DUMP_METHOD void dump(lldb::opaque_compiler_type_t type) const override {
-    DumpTypeDescription(type);
+    const_cast<TypeSystemRust*>(this)->DumpTypeDescription(type);
   }
 #endif
 
@@ -471,13 +475,13 @@ private:
 
   CompilerType CacheType(RustType *new_type);
 
-  RustASTContext(const RustASTContext &) = delete;
-  const RustASTContext &operator=(const RustASTContext &) = delete;
+  TypeSystemRust(const TypeSystemRust &) = delete;
+  const TypeSystemRust &operator=(const TypeSystemRust &) = delete;
 };
 
-class RustASTContextForExpr : public RustASTContext {
+class TypeSystemRustForExpr : public TypeSystemRust {
 public:
-  RustASTContextForExpr(lldb::TargetSP target) : m_target_wp(target) {}
+  TypeSystemRustForExpr(lldb::TargetSP target) : m_target_wp(target) {}
   UserExpression *GetUserExpression(llvm::StringRef expr,
                                     llvm::StringRef prefix,
                                     lldb::LanguageType language,
@@ -489,4 +493,4 @@ private:
   lldb::TargetWP m_target_wp;
 };
 } // namespace lldb_private
-#endif // liblldb_RustASTContext_h_
+#endif // liblldb_TypeSystemRust_h_
