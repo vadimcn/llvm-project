@@ -1,2 +1,3 @@
+set(TARGET_TRIPLE x86_64-windows-msvc)
 set(CMAKE_C_COMPILER cl)
 set(CMAKE_CXX_COMPILER cl)
