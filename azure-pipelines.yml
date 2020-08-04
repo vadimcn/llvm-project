@@ -1,3 +1,6 @@
+variables:
+  cachePrefix: 'A'
+
 jobs:
 - job: Linux
   pool:
@@ -22,12 +25,12 @@ jobs:
       cat /proc/meminfo
     displayName: 'Info'
 
-  - task: CacheBeta@0
+  - task: Cache@2
     inputs:
-      key: ccache | $(Agent.OS) | $(Triple) | $(Build.BuildId)
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
       restoreKeys: |
-        ccache | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
-        ccache | $(Agent.OS) | $(Triple)
+        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
+        $(cachePrefix) | $(Agent.OS) | $(Triple)
       path: $(Agent.BuildDirectory)/.ccache
       continueOnError: true
     displayName: CCache
@@ -37,27 +40,21 @@ jobs:
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
         -DCMAKE_BUILD_TYPE=MinSizeRel\
-        -DCMAKE_TOOLCHAIN_FILE=toolchain-$(Triple).cmake
+        -DCMAKE_TOOLCHAIN_FILE=toolchain-$(Triple).cmake\
+        -DRELEASE_PACKAGE=TRUE
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
     displayName: 'Build'
 
-  - script: |
-      cd $(Agent.BuildDirectory)/lldb
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--$(Triple).zip\
-        bin/lldb\
-        bin/lldb-argdumper\
-        bin/lldb-server\
-        bin/llvm-dwarfdump\
-        bin/llvm-pdbutil\
-        bin/llvm-readobj\
-        lib/liblldb.*\
-        lib/python3*/*-packages
-    displayName: 'Zip'
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: '$(Agent.BuildDirectory)'
+      contents: '*.zip'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
 
   - task: PublishBuildArtifacts@1
     inputs:
@@ -80,6 +77,12 @@ jobs:
   timeoutInMinutes: 360
 
   steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.5'
+      addToPath: true
+      architecture: 'x64'
+
   - script: |
       sysctl -a
     displayName: 'Info'
@@ -88,11 +91,12 @@ jobs:
       brew install pcre automake ninja ccache
     displayName: 'Install tools'
 
-  - task: CacheBeta@0
+  - task: Cache@2
     inputs:
-      key: ccache | $(Agent.OS) | $(Build.SourceVersion)
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
       restoreKeys: |
-        ccache | $(Agent.OS) 
+        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
+        $(cachePrefix) | $(Agent.OS) | $(Triple)
       path: $(Agent.BuildDirectory)/.ccache
       continueOnError: true
     displayName: CCache
@@ -101,35 +105,23 @@ jobs:
   - script: |
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-         -DCMAKE_BUILD_TYPE=RelWithDebInfo
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo\
+         -DRELEASE_PACKAGE=TRUE
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
       cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/lldb/bin/debugserver
+      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
     displayName: 'Build'
 
-  - script: |
-      cd $(Agent.BuildDirectory)/lldb
-      dsymutil bin/lldb -o bin/lldb.dSYM
-      dsymutil bin/lldb-argdumper -o bin/lldb-argdumper.dSYM
-      dsymutil lib/liblldb.dylib -o lib/liblldb.dSYM
-      zip -9 -y -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-apple-darwin.zip\
-        bin/lldb\
-        bin/lldb.dSYM\
-        bin/lldb-argdumper\
-        bin/lldb-argdumper.dSYM\
-        bin/debugserver\
-        bin/llvm-dwarfdump\
-        bin/llvm-pdbutil\
-        bin/llvm-readobj\
-        lib/liblldb.*\
-        lib/liblldb.*.dSYM\
-        lib/python3*/*-packages
-    displayName: 'Zip'
-
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: '$(Agent.BuildDirectory)'
+      contents: '*.zip'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+ 
   - task: PublishBuildArtifacts@1
     inputs:
       artifactName: 'lldb--x86_64-apple-darwin'
@@ -153,7 +145,7 @@ jobs:
   steps:
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.6'
+      versionSpec: '3.5'
       addToPath: true
       architecture: 'x64'
 
@@ -178,27 +170,21 @@ jobs:
       set LIBRARY_PATH=C:\tools\msys64\usr\lib
       git remote set-url origin local
       cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)^
-         -DCMAKE_BUILD_TYPE=RelWithDebInfo
+         -DCMAKE_BUILD_TYPE=RelWithDebInfo^
+         -DRELEASE_PACKAGE=TRUE
       cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
       type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
     displayName: 'Configure'
     
   - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb -- -v
+      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
     displayName: 'Build'
 
-  - script: |
-      cd $(Agent.BuildDirectory)/lldb
-      zip -9 -r $(Build.ArtifactStagingDirectory)/lldb--x86_64-windows-msvc.zip^
-        bin/lldb.*^
-        bin/lldb-argdumper.*^
-        bin/liblldb.*^
-        bin/llvm-dwarfdump.*^
-        bin/llvm-pdbutil.*^
-        bin/llvm-readobj.*^
-        lib/liblldb.*^
-        lib/*-packages
-    displayName: 'Zip'
+  - task: CopyFiles@2
+    inputs:
+      sourceFolder: '$(Agent.BuildDirectory)'
+      contents: '*.zip'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
 
   - task: PublishBuildArtifacts@1
     inputs:
