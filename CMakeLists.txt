@@ -1,12 +1,22 @@
 cmake_minimum_required(VERSION 3.12.0)
 project(build-lldb)
 
+set(RELEASE_PACKAGE FALSE CACHE BOOL "")
+
 include(ExternalProject)
 include(FindPythonInterp)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows" AND NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/toolchain-x86_64-windows-msvc.cmake)
     include(${CMAKE_TOOLCHAIN_FILE})
+endif()
+
+if (NOT TARGET_TRIPLE)
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+        set(TARGET_TRIPLE ${CMAKE_SYSTEM_PROCESSOR}-apple-darwin)
+    else()
+        set(TARGET_TRIPLE ${CMAKE_SYSTEM_PROCESSOR}-$<LOWER_CASE:${CMAKE_SYSTEM_NAME}>-gnu)
+    endif()
 endif()
 
 ExternalProject_Add(swig
@@ -79,7 +89,6 @@ set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/libxml2.a)
 set(SWIG_EXECUTABLE ${CMAKE_BINARY_DIR}/swig/swig)
 set(BuildTargets lldb llvm-dwarfdump llvm-pdbutil llvm-readobj)
 
-find_package (Python3 COMPONENTS Interpreter Development)
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(BuildTargets ${BuildTargets} lldb-server)
     set(CMakeArgs ${CMakeArgs} 
@@ -89,7 +98,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
         set(CMakeArgs ${CMakeArgs} 
             -DCMAKE_CROSSCOMPILING=TRUE
             -DLLVM_TARGET_ARCH=${CMAKE_SYSTEM_PROCESSOR}
-            -DLLVM_HOST_TRIPLE=${LLVM_TRIPLE}
+            -DLLVM_HOST_TRIPLE=${TARGET_TRIPLE}
         )
     endif()
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
@@ -97,10 +106,10 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
         -DLLDB_USE_SYSTEM_DEBUGSERVER=TRUE
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    get_filename_component(PYTHON_HOME ${Python3_EXECUTABLE} DIRECTORY)
-    set(Python3_LIBRARIES "${PYTHON_HOME}/libs/python3.lib")
     set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/xml2.lib)
 endif()
+
+find_package (Python3 COMPONENTS Interpreter Development)
 message("Python3_EXECUTABLE=${Python3_EXECUTABLE}  Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}  Python3_LIBRARIES=${Python3_LIBRARIES}")
 
 
@@ -119,7 +128,9 @@ set(CMakeArgs ${CMakeArgs}
     -DLLVM_ENABLE_LIBXML2=FORCE_ON
     -DLLVM_LIBXML2_ENABLED=TRUE
     -DLLDB_ENABLE_PYTHON=TRUE
-    -DLLDB_RELOCATABLE_PYTHON=TRUE
+    -DLLDB_EMBED_PYTHON_HOME=TRUE
+    -DLLDB_PYTHON_HOME=..
+    -DLLDB_PYTHON_RELATIVE_PATH=lib/lldb-python
     -DLLDB_ENABLE_LIBEDIT=FALSE
     -DLLDB_ENABLE_CURSES=FALSE
     -DLLDB_ENABLE_LZMA=FALSE
@@ -156,7 +167,7 @@ foreach(Target ${BuildTargets})
 endforeach()
 
 ExternalProject_Add(lldb
-    DEPENDS libxml2 swig 
+    DEPENDS libxml2 swig
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/llvm
     BINARY_DIR ${CMAKE_BINARY_DIR}/lldb
     CMAKE_ARGS ${CMakeArgs}
@@ -167,4 +178,9 @@ ExternalProject_Add(lldb
     BUILD_ALWAYS TRUE
     USES_TERMINAL_CONFIGURE TRUE
     USES_TERMINAL_BUILD TRUE
+)
+
+add_custom_target(package_lldb DEPENDS lldb
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/package-lldb.py --lldb_root=${CMAKE_BINARY_DIR}/lldb --target=${TARGET_TRIPLE} --strip=${CMAKE_STRIP} $<$<BOOL:${RELEASE_PACKAGE}>:--release_package>
+                                    ${CMAKE_BINARY_DIR}/lldb--${TARGET_TRIPLE}.zip ${CMAKE_BINARY_DIR}/lldb-debug--${TARGET_TRIPLE}.zip
 )
