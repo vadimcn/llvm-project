@@ -53,6 +53,10 @@
 #include "ProcessWindowsLog.h"
 #include "TargetThreadWindows.h"
 
+#pragma warning(disable : 4005)
+#include "winternl.h"
+#include <ntstatus.h>
+
 using namespace lldb;
 using namespace lldb_private;
 
@@ -364,6 +368,7 @@ void ProcessWindows::RefreshStateAfterStop() {
     stop_thread->SetThreadStoppedAtUnexecutedBP(pc);
 
   switch (active_exception->GetExceptionValue()) {
+  case STATUS_WX86_SINGLE_STEP:
   case EXCEPTION_SINGLE_STEP: {
     auto *reg_ctx = static_cast<RegisterContextWindows *>(
         stop_thread->GetRegisterContext().get());
@@ -388,6 +393,7 @@ void ProcessWindows::RefreshStateAfterStop() {
     return;
   }
 
+  case STATUS_WX86_BREAKPOINT:
   case EXCEPTION_BREAKPOINT: {
     int breakpoint_size = 1;
     switch (GetTarget().GetArchitecture().GetMachine()) {
@@ -722,6 +728,7 @@ ProcessWindows::OnDebugException(bool first_chance,
 
   ExceptionResult result = ExceptionResult::SendToApplication;
   switch (record.GetExceptionValue()) {
+  case STATUS_WX86_BREAKPOINT:
   case EXCEPTION_BREAKPOINT: {
     const lldb::addr_t bp_addr = record.GetExceptionAddress();
     if (m_pending_halt) {
@@ -761,6 +768,7 @@ ProcessWindows::OnDebugException(bool first_chance,
     SetPrivateState(eStateStopped);
     break;
   }
+  case STATUS_WX86_SINGLE_STEP:
   case EXCEPTION_SINGLE_STEP:
     result = ExceptionResult::BreakInDebugger;
     DrainProcessStdout();
