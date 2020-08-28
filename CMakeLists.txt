@@ -93,6 +93,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(BuildTargets ${BuildTargets} lldb-server)
     set(CMakeArgs ${CMakeArgs} 
         "-DCMAKE_CXX_FLAGS=-static-libstdc++ -static-libgcc"
+        -DLLVM_ENABLE_ZLIB=FORCE_ON
     )
     if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
         set(CMakeArgs ${CMakeArgs} 
@@ -104,6 +105,7 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
     set(CMakeArgs ${CMakeArgs} 
         -DLLDB_USE_SYSTEM_DEBUGSERVER=TRUE
+        -DLLVM_ENABLE_ZLIB=FORCE_ON
     )
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/xml2.lib)

@@ -11,11 +11,11 @@ jobs:
   strategy:
     matrix:
       x86_64:
-        Triple: 'x86_64-linux-gnu'      
+        Triple: 'x86_64-linux-gnu'
       arm:
-        Triple: 'arm-linux-gnueabihf'      
+        Triple: 'arm-linux-gnueabihf'
       aarch64:
-        Triple: 'aarch64-linux-gnu'      
+        Triple: 'aarch64-linux-gnu'
 
   timeoutInMinutes: 360
 
@@ -73,6 +73,9 @@ jobs:
 - job: OSX
   pool:
     vmImage: 'macOS-10.14'
+
+  variables:
+    Triple: 'x86_64-apple-darwin'
 
   timeoutInMinutes: 360
 
