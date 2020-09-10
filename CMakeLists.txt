@@ -117,10 +117,7 @@ if (CMAKE_CROSSCOMPILING)
         USES_TERMINAL_CONFIGURE TRUE
         USES_TERMINAL_BUILD TRUE
     )
-
     set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/host_python/bin/python3.8)
-    set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/include)
-    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.so)
 else()
     externalproject_add(python
         PREFIX python
@@ -135,11 +132,22 @@ else()
         USES_TERMINAL_CONFIGURE TRUE
         USES_TERMINAL_BUILD TRUE
     )
-
     set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/bin/python3.8)
-    set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/include)
-    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.so)
 endif()
+
+set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/include/python3.8)
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.so)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.dylib)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/python38.lib)
+endif()
+
+# set(Python3_ROOT_DIR ${CMAKE_BINARY_DIR}/host_python)
+# set(Python3_USE_STATIC_LIBS FALSE)
+# find_package (Python3 COMPONENTS Interpreter Development)
+# message("###   Python3_EXECUTABLE=${Python3_EXECUTABLE}  Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}  Python3_LIBRARIES=${Python3_LIBRARIES}")
 
 #---------------------------------------------------------------------
 
@@ -171,10 +179,6 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
 elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/xml2.lib)
 endif()
-
-# find_package (Python3 COMPONENTS Interpreter)
-# message("Python3_EXECUTABLE=${Python3_EXECUTABLE}  Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}  Python3_LIBRARIES=${Python3_LIBRARIES}")
-
 
 string(JOIN "$<SEMICOLON>" LLVM_ENABLE_PROJECTS ${LLVM_ENABLE_PROJECTS})
 string(JOIN "$<SEMICOLON>" LLVM_TARGETS_TO_BUILD ${LLVM_TARGETS_TO_BUILD})
