@@ -82,72 +82,75 @@ externalproject_add(libxml2
     USES_TERMINAL_BUILD TRUE
 )
 
-if (CMAKE_CROSSCOMPILING)
-    externalproject_add(host_python
-        PREFIX host_python
-        GIT_REPOSITORY https://github.com/python/cpython.git
-        GIT_TAG 3.8
-        GIT_SHALLOW TRUE
-        UPDATE_COMMAND ""
-        CONFIGURE_COMMAND bash <SOURCE_DIR>/configure --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR>
-        BUILD_COMMAND make
-        INSTALL_COMMAND make install
-        STEP_TARGETS configure build install
-        USES_TERMINAL_CONFIGURE TRUE
-        USES_TERMINAL_BUILD TRUE
-    )
+if (NOT ${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    if (CMAKE_CROSSCOMPILING)
+        externalproject_add(host_python
+            PREFIX host_python
+            GIT_REPOSITORY https://github.com/python/cpython.git
+            GIT_TAG 3.8
+            GIT_SHALLOW TRUE
+            UPDATE_COMMAND ""
+            CONFIGURE_COMMAND bash <SOURCE_DIR>/configure --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR>
+            BUILD_COMMAND make
+            INSTALL_COMMAND make install
+            STEP_TARGETS configure build install
+            USES_TERMINAL_CONFIGURE TRUE
+            USES_TERMINAL_BUILD TRUE
+        )
 
-    file(WRITE ${CMAKE_BINARY_DIR}/python/src/config.site "ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\n")
-    externalproject_add(python
-        PREFIX python
-        DEPENDS host_python
-        GIT_REPOSITORY https://github.com/python/cpython.git
-        GIT_TAG 3.8
-        GIT_SHALLOW TRUE
-        UPDATE_COMMAND ""
+        file(WRITE ${CMAKE_BINARY_DIR}/python/src/config.site "ac_cv_file__dev_ptmx=no\nac_cv_file__dev_ptc=no\n")
+        externalproject_add(python
+            PREFIX python
+            DEPENDS host_python
+            GIT_REPOSITORY https://github.com/python/cpython.git
+            GIT_TAG 3.8
+            GIT_SHALLOW TRUE
+            UPDATE_COMMAND ""
+            CONFIGURE_COMMAND ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" 
         CONFIGURE_COMMAND ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" 
-                                     "CONFIG_SITE=${CMAKE_BINARY_DIR}/python/src/config.site"
+            CONFIGURE_COMMAND ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" 
+                                        "CONFIG_SITE=${CMAKE_BINARY_DIR}/python/src/config.site"
+                                        bash <SOURCE_DIR>/configure 
                                      bash <SOURCE_DIR>/configure 
-                                        --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR> --enable-shared
-                                        --host=${TARGET_TRIPLE} --build=x86_64-linux-gnu
-                                        --disable-ipv6
-        BUILD_COMMAND   ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" make
-        INSTALL_COMMAND ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" make install
-        STEP_TARGETS configure build install
-        USES_TERMINAL_CONFIGURE TRUE
-        USES_TERMINAL_BUILD TRUE
-    )
-    set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/host_python/bin/python3.8)
+                                        bash <SOURCE_DIR>/configure 
+                                            --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR> --enable-shared
+                                            --host=${TARGET_TRIPLE} --build=x86_64-linux-gnu
+                                            --disable-ipv6
+            BUILD_COMMAND   ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" make
+            INSTALL_COMMAND ${WithEnv} "PATH=${CMAKE_BINARY_DIR}/host_python/bin:$ENV{PATH}" make install
+            STEP_TARGETS configure build install
+            USES_TERMINAL_CONFIGURE TRUE
+            USES_TERMINAL_BUILD TRUE
+        )
+        set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/host_python/bin/python3.8)
+    else()
+        externalproject_add(python
+            PREFIX python
+            GIT_REPOSITORY https://github.com/python/cpython.git
+            GIT_TAG 3.8
+            GIT_SHALLOW TRUE
+            UPDATE_COMMAND ""
+            CONFIGURE_COMMAND bash <SOURCE_DIR>/configure --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR> --enable-shared "LDFLAGS=-Wl,-rpath,\\$$ORIGIN/../lib"
+            BUILD_COMMAND make
+            INSTALL_COMMAND make install
+            STEP_TARGETS configure build install
+            USES_TERMINAL_CONFIGURE TRUE
+            USES_TERMINAL_BUILD TRUE
+        )
+        set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/bin/python3.8)
+    endif()
+
+    set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/include/python3.8)
+    if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+        set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.so)
+    elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+        set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.dylib)
+    endif()    
 else()
-    externalproject_add(python
-        PREFIX python
-        GIT_REPOSITORY https://github.com/python/cpython.git
-        GIT_TAG 3.8
-        GIT_SHALLOW TRUE
-        UPDATE_COMMAND ""
-        CONFIGURE_COMMAND bash <SOURCE_DIR>/configure --srcdir=<SOURCE_DIR> --prefix=<INSTALL_DIR> --enable-shared "LDFLAGS=-Wl,-rpath,\\$$ORIGIN/../lib"
-        BUILD_COMMAND make
-        INSTALL_COMMAND make install
-        STEP_TARGETS configure build install
-        USES_TERMINAL_CONFIGURE TRUE
-        USES_TERMINAL_BUILD TRUE
-    )
-    set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/bin/python3.8)
+    # Uses installed Python3
+    find_package (Python3 COMPONENTS Interpreter Development)
+    add_custom_target(python)
 endif()
-
-set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/include/python3.8)
-if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.so)
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
-    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/libpython3.8.dylib)
-elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/lib/python38.lib)
-endif()
-
-# set(Python3_ROOT_DIR ${CMAKE_BINARY_DIR}/host_python)
-# set(Python3_USE_STATIC_LIBS FALSE)
-# find_package (Python3 COMPONENTS Interpreter Development)
-# message("###   Python3_EXECUTABLE=${Python3_EXECUTABLE}  Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}  Python3_LIBRARIES=${Python3_LIBRARIES}")
 
 #---------------------------------------------------------------------
 
