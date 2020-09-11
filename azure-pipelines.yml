@@ -1,5 +1,28 @@
 variables:
-  cachePrefix: 'A'
+  cachePrefix: 'B'
+  buildTools: $(Agent.BuildDirectory)/build-tools
+  llvmProject: $(Build.SourcesDirectory)/llvm-project
+  SCCACHE: sccache
+  SCCACHE_DIR: $(Agent.BuildDirectory)/sccache
+  SCCACHE_IDLE_TIMEOUT: 60
+
+resources:
+  repositories:
+  - repository: build-tools-linux
+    type: github
+    endpoint: github.com_vadimcn
+    name: vadimcn/build-tools
+    ref: linux
+  - repository: build-tools-darwin
+    type: github
+    endpoint: github.com_vadimcn
+    name: vadimcn/build-tools
+    ref: darwin
+  - repository: build-tools-windows
+    type: github
+    endpoint: github.com_vadimcn
+    name: vadimcn/build-tools
+    ref: windows
 
 jobs:
 - job: Linux
@@ -20,31 +43,44 @@ jobs:
   timeoutInMinutes: 360
 
   steps:
+  - checkout: self
+    submodules: true
+    fetchDepth: 1
+
+  - checkout: build-tools-linux
+    path: build-tools
+    submodules: true
+    lfs: true
+    fetchDepth: 1
+
   - script: |
-      cat /proc/cpuinfo
-      cat /proc/meminfo
-    displayName: 'Info'
+      echo "##vso[task.prependpath]$(buildTools)/bin"
+    displayName: Update path
 
   - task: Cache@2
     inputs:
       key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
       restoreKeys: |
-        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
         $(cachePrefix) | $(Agent.OS) | $(Triple)
-      path: $(Agent.BuildDirectory)/.ccache
+      path: $(SCCACHE_DIR)
       continueOnError: true
-    displayName: CCache
+    displayName: SCCache
     condition: always()
 
   - script: |
       git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)\
         -DCMAKE_BUILD_TYPE=MinSizeRel\
         -DCMAKE_TOOLCHAIN_FILE=toolchain-$(Triple).cmake\
-        -DRELEASE_PACKAGE=TRUE
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+        -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)\
+        -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)\
+        -DRELEASE_PACKAGE=TRUE\
+        -DPYTHON_STANDALONE=$(buildTools)/python
     displayName: 'Configure'
+
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+    displayName: 'Build Dependencies'
     
   - script: |
       cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
@@ -61,12 +97,15 @@ jobs:
       artifactName: 'lldb--$(Triple)'
 
   - script: |
-      env
-      find $(Agent.BuildDirectory) -type d
-      cat $(Agent.BuildDirectory)/CMakeCache.txt
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
-    displayName: 'On Failure'
-    condition: failed()
+      cd $(Agent.BuildDirectory)
+      cat /proc/cpuinfo > system.log
+      cat /proc/meminfo >> system.log
+      env > env.log
+      find $(Agent.BuildDirectory) -type d > tree.log
+      zip --recurse-patterns $(Agent.BuildDirectory)/$(Triple).zip "*.log" "CMakeCache.txt"
+      echo "##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)/$(Triple).zip"
+    displayName: 'Logs'
+    condition: always()    
 
 ############################################################
 
@@ -80,6 +119,20 @@ jobs:
   timeoutInMinutes: 360
 
   steps:
+  - checkout: self
+    submodules: true
+    fetchDepth: 1
+
+  - checkout: build-tools-darwin
+    path: build-tools
+    submodules: true
+    lfs: true
+    fetchDepth: 1
+
+  - script: |
+      echo "##vso[task.prependpath]$(buildTools)/bin"
+    displayName: Update path    
+
   - task: UsePythonVersion@0
     inputs:
       versionSpec: '3.5'
@@ -87,33 +140,33 @@ jobs:
       architecture: 'x64'
 
   - script: |
-      sysctl -a
-    displayName: 'Info'
-
-  - script: |
-      brew install pcre automake ninja ccache
+      brew install pcre automake ninja pkg-config
     displayName: 'Install tools'
 
   - task: Cache@2
     inputs:
       key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
       restoreKeys: |
-        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.SourceVersion)
         $(cachePrefix) | $(Agent.OS) | $(Triple)
-      path: $(Agent.BuildDirectory)/.ccache
+      path: $(SCCACHE_DIR)
       continueOnError: true
-    displayName: CCache
+    displayName: SCCache
     condition: always()
 
   - script: |
       git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)\
-         -DCMAKE_BUILD_TYPE=RelWithDebInfo\
-         -DRELEASE_PACKAGE=TRUE
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)\
+         -DCMAKE_BUILD_TYPE=MinSizeRel\
+         -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)\
+         -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)\
+         -DRELEASE_PACKAGE=TRUE\
+         -DPYTHON_STANDALONE=$(buildTools)/python
     displayName: 'Configure'
-    
+
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+    displayName: 'Build Dependencies'
+
   - script: |
       cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/lldb/bin/debugserver
       cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
@@ -130,25 +183,45 @@ jobs:
       artifactName: 'lldb--x86_64-apple-darwin'
 
   - script: |
-      env
-      find $(Agent.BuildDirectory) -type d
-      cat $(Agent.BuildDirectory)/CMakeCache.txt
-      cat $(Agent.BuildDirectory)/lldb/CMakeCache.txt
-    displayName: 'On Failure'
-    condition: failed()
+      cd $(Agent.BuildDirectory)
+      sysctl -a > system.log
+      env > env.log
+      find $(Agent.BuildDirectory) -type d > tree.log
+      zip --recurse-patterns $(Agent.BuildDirectory)/$(Triple).zip "*.log" "CMakeCache.txt"
+      echo "##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)/$(Triple).zip"
+    displayName: 'Logs'
+    condition: always()
 
 ############################################################
 
 - job: Windows
   pool:
     vmImage: 'VS2017-Win2016'
+
+  variables:
+    Triple: 'x86_64-windows-msvc'
     
   timeoutInMinutes: 360
 
   steps:
+  - checkout: self
+    submodules: true
+    fetchDepth: 1
+
+  - checkout: build-tools-windows
+    path: build-tools
+    submodules: true
+    lfs: true
+    fetchDepth: 1
+
+  - script: |
+      echo vso[task.prependpath]$(buildTools)/bin
+      echo ##vso[task.prependpath]$(buildTools)/bin
+    displayName: Update path    
+
   - task: UsePythonVersion@0
     inputs:
-      versionSpec: '3.5'
+      versionSpec: '3.8'
       addToPath: true
       architecture: 'x64'
 
@@ -160,25 +233,38 @@ jobs:
     displayName: VsDevCmd
 
   - script: |
-      choco install zip
-      choco install ninja
       choco install msys2 --params "/NoUpdate"
       C:\tools\msys64\usr\bin\pacman --noconfirm -S automake autoconf 
       C:\tools\msys64\usr\bin\pacman --noconfirm -S pcre-devel bison sed
+      echo ##vso[task.prependpath]C:\tools\msys64\usr\bin
+      echo ##vso[task.setvariable variable=CPATH;]C:\tools\msys64\usr\include
+      echo ##vso[task.setvariable variable=LIBRARY_PATH;]C:\tools\msys64\usr\lib
     displayName: 'Install tools'
 
+  - task: Cache@2
+    inputs:
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
+      restoreKeys: |
+        $(cachePrefix) | $(Agent.OS) | $(Triple)
+      path: $(SCCACHE_DIR)
+      continueOnError: true
+    displayName: SCCache
+    condition: always()
+
   - script: |
-      set PATH=C:\tools\msys64\usr\bin;%PATH%
-      set CPATH=C:\tools\msys64\usr\include
-      set LIBRARY_PATH=C:\tools\msys64\usr\lib
       git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(Build.SourcesDirectory)^
-         -DCMAKE_BUILD_TYPE=RelWithDebInfo^
-         -DRELEASE_PACKAGE=TRUE
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-      type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
+      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)^
+         -DCMAKE_BUILD_TYPE=MinSizeRel^
+         -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)^
+         -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)^
+         -DRELEASE_PACKAGE=TRUE^
+         -DPYTHON_STANDALONE=$(buildTools)/python
     displayName: 'Configure'
-    
+
+  - script: |
+      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
+    displayName: 'Build Dependencies'
+
   - script: |
       cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
     displayName: 'Build'
@@ -194,9 +280,10 @@ jobs:
       artifactName: 'lldb--x86_64-windows-msvc'
 
   - script: |
-      set
-      tree /a $(Agent.BuildDirectory)
-      type $(Agent.BuildDirectory)\CMakeCache.txt
-      type $(Agent.BuildDirectory)\lldb\CMakeCache.txt
-    displayName: 'On Failure'
-    condition: failed()
+      cd $(Agent.BuildDirectory)
+      set > env.log
+      tree /a > tree.log
+      zip --recurse-patterns $(Agent.BuildDirectory)\$(Triple).zip "*.log" "CMakeCache.txt"
+      echo ##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)\$(Triple).zip
+    displayName: 'Logs'
+    condition: always()

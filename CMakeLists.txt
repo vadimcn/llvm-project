@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.12.0)
 project(build-lldb)
 
+set(PYTHON_STANDALONE FALSE CACHE PATH "")
 set(RELEASE_PACKAGE FALSE CACHE BOOL "")
 
 include(ExternalProject)
-include(FindPythonInterp)
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "Windows" AND NOT CMAKE_TOOLCHAIN_FILE)
     set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/toolchain-x86_64-windows-msvc.cmake)
@@ -19,7 +19,9 @@ if (NOT TARGET_TRIPLE)
     endif()
 endif()
 
-ExternalProject_Add(swig
+set(WithEnv ${CMAKE_COMMAND} -E env)
+
+externalproject_add(swig
     GIT_REPOSITORY https://github.com/vadimcn/swig.git
     GIT_TAG py3-stable-abi
     SOURCE_DIR ${CMAKE_BINARY_DIR}/swig
@@ -34,13 +36,15 @@ ExternalProject_Add(swig
     USES_TERMINAL_BUILD TRUE
 )
 
-ExternalProject_Add(libxml2
+externalproject_add(libxml2
     GIT_REPOSITORY https://github.com/robotology-dependencies/libxml2-cmake-buildsystem.git
     GIT_TAG master
     UPDATE_COMMAND ""
     CMAKE_ARGS
         -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
         -DCMAKE_BUILD_TYPE=MinSizeRel
+        -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+        -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
         $<$<NOT:$<PLATFORM_ID:Windows>>:-DCMAKE_C_FLAGS=-fPIC>
         -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/libxml2
         -DBUILD_SHARED_LIBS=OFF 
@@ -80,6 +84,79 @@ ExternalProject_Add(libxml2
     USES_TERMINAL_BUILD TRUE
 )
 
+# Python
+set(PythonDist ${CMAKE_BINARY_DIR}/python-dist)
+if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+    if (CMAKE_CROSSCOMPILING)
+        set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/host_python/install/bin/python3)
+        set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/install/include/python3.8)
+        set(Python3_LIBRARIES ${PythonDist}/lib/libpython38.so)
+
+        add_custom_command(OUTPUT ${PythonDist}/lib/libpython38.so
+            DEPENDS ${CMAKE_SOURCE_DIR}/packaging/python.py
+            COMMAND zstd -dcf ${PYTHON_STANDALONE}/cpython-*-x86_64-*.tar.zst | tar --directory=${CMAKE_BINARY_DIR} -xf -
+            COMMAND rm -rf ${CMAKE_BINARY_DIR}/host_python
+            COMMAND mv ${CMAKE_BINARY_DIR}/python ${CMAKE_BINARY_DIR}/host_python
+            COMMAND zstd -dcf ${PYTHON_STANDALONE}/cpython-*-${CMAKE_SYSTEM_PROCESSOR}-*.tar.zst | tar --directory=${CMAKE_BINARY_DIR} -xf -
+            COMMAND ${WithEnv} PYTHONPATH=${CMAKE_SOURCE_DIR}
+                        ${Python3_EXECUTABLE} -m packaging.python
+                            --python_dist=${CMAKE_BINARY_DIR}/python
+                            --target=${TARGET_TRIPLE}
+                            --cc=${CMAKE_C_COMPILER}
+                            --strip=${CMAKE_STRIP}
+                            --output=${PythonDist}
+        )
+    else()
+        set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/install/bin/python3)
+        set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/install/include/python3.8)
+        set(Python3_LIBRARIES ${PythonDist}/lib/libpython38.so)
+
+        add_custom_command(OUTPUT ${PythonDist}/lib/libpython38.so
+            DEPENDS ${CMAKE_SOURCE_DIR}/packaging/python.py
+            COMMAND zstd -dcf ${PYTHON_STANDALONE}/cpython-*-x86_64-*.tar.zst | tar --directory=${CMAKE_BINARY_DIR} -xf -
+            COMMAND ${WithEnv} PYTHONPATH=${CMAKE_SOURCE_DIR}
+                        ${Python3_EXECUTABLE} -m packaging.python
+                            --python_dist=${CMAKE_BINARY_DIR}/python
+                            --target=${TARGET_TRIPLE}
+                            --cc=${CMAKE_C_COMPILER}
+                            --strip=${CMAKE_STRIP}
+                            --output=${PythonDist}
+        )
+    endif()
+    add_custom_target(python DEPENDS ${PythonDist}/lib/libpython38.so)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Darwin")
+    set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/install/bin/python3)
+    set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/install/include/python3.8)
+    set(Python3_LIBRARIES ${PythonDist}/lib/libpython38.dylib)
+
+    add_custom_command(OUTPUT ${PythonDist}/lib/libpython38.dylib
+        DEPENDS ${CMAKE_SOURCE_DIR}/packaging/python.py
+        COMMAND zstd -dcf ${PYTHON_STANDALONE}/cpython-*-x86_64-*.tar.zst | tar --directory=${CMAKE_BINARY_DIR} -xf -
+        COMMAND ${WithEnv} PYTHONPATH=${CMAKE_SOURCE_DIR}
+                    ${Python3_EXECUTABLE} -m packaging.python
+                        --python_dist=${CMAKE_BINARY_DIR}/python
+                        --target=${TARGET_TRIPLE}
+                        --output=${PythonDist}
+    )
+    add_custom_target(python DEPENDS ${PythonDist}/lib/libpython38.dylib)
+elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
+    set(Python3_EXECUTABLE ${CMAKE_BINARY_DIR}/python/install/python.exe)
+    set(Python3_INCLUDE_DIRS ${CMAKE_BINARY_DIR}/python/install/include)
+    set(Python3_LIBRARIES ${CMAKE_BINARY_DIR}/python/install/libs/python38.lib)
+
+    add_custom_command(OUTPUT ${PythonDist}/bin/python38.dll
+        DEPENDS ${CMAKE_SOURCE_DIR}/packaging/python.py
+        COMMAND zstd -dcf ${PYTHON_STANDALONE}/cpython-*-x86_64-*.tar.zst | tar --directory=${CMAKE_BINARY_DIR} -xf -
+        COMMAND ${WithEnv} PYTHONPATH=${CMAKE_SOURCE_DIR}
+                    ${Python3_EXECUTABLE} -m packaging.python
+                        --target=${TARGET_TRIPLE}
+                        --python_dist=${CMAKE_BINARY_DIR}/python
+                        --output=${PythonDist}
+    )
+    add_custom_target(python DEPENDS ${PythonDist}/bin/python38.dll)
+endif()
+    
+
 #---------------------------------------------------------------------
 
 set(LLVM_ENABLE_PROJECTS clang libcxx lldb)
@@ -93,11 +170,13 @@ if (${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
     set(BuildTargets ${BuildTargets} lldb-server)
     set(CMakeArgs ${CMakeArgs} 
         "-DCMAKE_CXX_FLAGS=-static-libstdc++ -static-libgcc"
+        -DCMAKE_EXE_LINKER_FLAGS=-L${CMAKE_BINARY_DIR}/python/build/lib
+        -DCMAKE_SHARED_LINKER_FLAGS=-L${CMAKE_BINARY_DIR}/python/build/lib
         -DLLVM_ENABLE_ZLIB=FORCE_ON
     )
-    if (NOT ${CMAKE_SYSTEM_PROCESSOR} STREQUAL ${CMAKE_HOST_SYSTEM_PROCESSOR})
+    if (CMAKE_CROSSCOMPILING)
         set(CMakeArgs ${CMakeArgs} 
-            -DCMAKE_CROSSCOMPILING=TRUE
+            -DCMAKE_CROSSCOMPILING=${CMAKE_CROSSCOMPILING}
             -DLLVM_TARGET_ARCH=${CMAKE_SYSTEM_PROCESSOR}
             -DLLVM_HOST_TRIPLE=${TARGET_TRIPLE}
         )
@@ -111,16 +190,16 @@ elseif (${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(LIBXML2_LIBRARY ${CMAKE_BINARY_DIR}/libxml2/lib/xml2.lib)
 endif()
 
-find_package (Python3 COMPONENTS Interpreter Development)
-message("Python3_EXECUTABLE=${Python3_EXECUTABLE}  Python3_INCLUDE_DIRS=${Python3_INCLUDE_DIRS}  Python3_LIBRARIES=${Python3_LIBRARIES}")
-
-
 string(JOIN "$<SEMICOLON>" LLVM_ENABLE_PROJECTS ${LLVM_ENABLE_PROJECTS})
 string(JOIN "$<SEMICOLON>" LLVM_TARGETS_TO_BUILD ${LLVM_TARGETS_TO_BUILD})
+string(JOIN "$<SEMICOLON>" Python3_INCLUDE_DIRS ${Python3_INCLUDE_DIRS})
+string(JOIN "$<SEMICOLON>" Python3_LIBRARIES ${Python3_LIBRARIES})
 
 set(CMakeArgs ${CMakeArgs}
     -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE}
     -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    -DCMAKE_C_COMPILER_LAUNCHER=${CMAKE_C_COMPILER_LAUNCHER}
+    -DCMAKE_CXX_COMPILER_LAUNCHER=${CMAKE_CXX_COMPILER_LAUNCHER}
     -DLLVM_ENABLE_PROJECTS=${LLVM_ENABLE_PROJECTS}
     -DLLVM_TARGETS_TO_BUILD=${LLVM_TARGETS_TO_BUILD}
     -DLLVM_PARALLEL_LINK_JOBS=1
@@ -145,14 +224,6 @@ set(CMakeArgs ${CMakeArgs}
     -DLIBXML2_LIBRARY=${LIBXML2_LIBRARY}
 )
 
-find_program(CCACHE_PROGRAM ccache)
-if(CCACHE_PROGRAM)
-    set(CMakeArgs ${CMakeArgs}
-        -DLLVM_CCACHE_BUILD=TRUE
-        -DLLVM_CCACHE_DIR=${CMAKE_BINARY_DIR}/.ccache
-    )
-endif()
-
 message("CMakeArgs: ${CMakeArgs}")
 
 set(CROSS_TOOLCHAIN_FLAGS_NATIVE 
@@ -162,14 +233,15 @@ set(CROSS_TOOLCHAIN_FLAGS_NATIVE
 )
 string(JOIN "$<SEMICOLON>" CROSS_TOOLCHAIN_FLAGS_NATIVE ${CROSS_TOOLCHAIN_FLAGS_NATIVE})
 
+
 foreach(Target ${BuildTargets})
     set(BuildCommands ${BuildCommands} 
-        COMMAND ${CMAKE_COMMAND} -E env "SWIG_LIB=${CMAKE_BINARY_DIR}/swig/Lib"
+        COMMAND ${CMAKE_COMMAND} -E env "SWIG_LIB=${CMAKE_BINARY_DIR}/swig/Lib" 
                 ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR}/lldb --target ${Target} -- -v)
 endforeach()
 
-ExternalProject_Add(lldb
-    DEPENDS libxml2 swig
+externalproject_add(lldb
+    DEPENDS python libxml2 swig
     SOURCE_DIR ${CMAKE_SOURCE_DIR}/llvm
     BINARY_DIR ${CMAKE_BINARY_DIR}/lldb
     CMAKE_ARGS ${CMakeArgs}
@@ -182,7 +254,13 @@ ExternalProject_Add(lldb
     USES_TERMINAL_BUILD TRUE
 )
 
-add_custom_target(package_lldb DEPENDS lldb
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/package-lldb.py --lldb_root=${CMAKE_BINARY_DIR}/lldb --target=${TARGET_TRIPLE} --strip=${CMAKE_STRIP} $<$<BOOL:${RELEASE_PACKAGE}>:--release_package>
-                                    ${CMAKE_BINARY_DIR}/lldb--${TARGET_TRIPLE}.zip ${CMAKE_BINARY_DIR}/lldb-debug--${TARGET_TRIPLE}.zip
+add_custom_target(package_lldb DEPENDS python lldb
+    COMMAND ${WithEnv} PYTHONPATH=${CMAKE_SOURCE_DIR} 
+                ${Python3_EXECUTABLE} -m packaging.lldb
+                    --lldb_root=${CMAKE_BINARY_DIR}/lldb 
+                    --python_dist=${PythonDist}
+                    --target=${TARGET_TRIPLE}  
+                    --strip=${CMAKE_STRIP} $<$<BOOL:${RELEASE_PACKAGE}>:--release_package>
+                    --output=${CMAKE_BINARY_DIR}/lldb--${TARGET_TRIPLE}.zip 
+                    --debug_output=${CMAKE_BINARY_DIR}/lldb-debug--${TARGET_TRIPLE}.zip
 )
