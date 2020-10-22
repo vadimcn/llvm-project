@@ -9,19 +9,16 @@ variables:
 resources:
   repositories:
   - repository: build-tools-linux
-    type: github
-    endpoint: github.com_vadimcn
-    name: vadimcn/build-tools
+    type: git
+    name: llvm/build-tools
     ref: linux
   - repository: build-tools-darwin
-    type: github
-    endpoint: github.com_vadimcn
-    name: vadimcn/build-tools
+    type: git
+    name: llvm/build-tools
     ref: darwin
   - repository: build-tools-windows
-    type: github
-    endpoint: github.com_vadimcn
-    name: vadimcn/build-tools
+    type: git
+    name: llvm/build-tools
     ref: windows
 
 jobs:
