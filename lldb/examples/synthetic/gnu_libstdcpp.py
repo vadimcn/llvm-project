@@ -235,7 +235,6 @@ class StdVectorSynthProvider:
                     self.count = 0
             except:
                 pass
-            return True
 
     class StdVBoolImplementation(object):
 
@@ -282,7 +281,6 @@ class StdVectorSynthProvider:
                 self.valid = True
             except:
                 self.valid = False
-            return True
 
     def __init__(self, valobj, dict):
         logger = lldb.formatters.Logger.Logger()
