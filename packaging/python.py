@@ -23,7 +23,7 @@ def main(args):
     def should_include(name, ext):
         if ext['required']:
             return True
-        if name in ['_ctypes', '_ssl', '_scproxy', 'zlib']: # Needed for codelldb or pip.
+        if name in ['_ctypes', '_socket', '_ssl', '_scproxy', 'select', 'zlib']: # Needed for codelldb or pip.
             return True
         allowed_libs = ['intl', 'iconv'] # For some reason these are linked to most extensions on Mac.
         extra_libs = [lib for lib in ext.get('links', []) if lib['name'] not in allowed_libs]
