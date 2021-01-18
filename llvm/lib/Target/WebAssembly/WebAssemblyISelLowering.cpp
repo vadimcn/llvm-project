@@ -38,6 +38,8 @@
 #include "llvm/Target/TargetOptions.h"
 using namespace llvm;
 
+#pragma clang optimize off // Work around a crash in clang ARM codegen 
+
 #define DEBUG_TYPE "wasm-lower"
 
 WebAssemblyTargetLowering::WebAssemblyTargetLowering(
