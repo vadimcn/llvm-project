@@ -54,6 +54,12 @@ enum MSDemangleFlags {
 char *microsoftDemangle(std::string_view mangled_name, size_t *n_read,
                         int *status, MSDemangleFlags Flags = MSDF_None);
 
+// Checks whether this is a Rust legacy mangled symbol.
+bool isRustLegacyMangling(std::string_view MangledName);
+
+// Demangles a Rust legacy mangled symbol.
+char *rustLegacyDemangle(std::string_view MangledName);
+
 // Demangles a Rust v0 mangled symbol.
 char *rustDemangle(std::string_view MangledName);
 

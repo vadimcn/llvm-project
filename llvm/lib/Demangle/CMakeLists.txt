@@ -4,6 +4,7 @@ add_llvm_component_library(LLVMDemangle
   MicrosoftDemangle.cpp
   MicrosoftDemangleNodes.cpp
   RustDemangle.cpp
+  RustLegacyDemangle.cpp
   DLangDemangle.cpp
 
   ADDITIONAL_HEADER_DIRS

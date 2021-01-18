@@ -48,9 +48,12 @@ static bool isDLangEncoding(std::string_view S) { return starts_with(S, "_D"); }
 bool llvm::nonMicrosoftDemangle(std::string_view MangledName,
                                 std::string &Result) {
   char *Demangled = nullptr;
-  if (isItaniumEncoding(MangledName))
-    Demangled = itaniumDemangle(MangledName);
-  else if (isRustEncoding(MangledName))
+  if (isItaniumEncoding(MangledName)) {
+    if (isRustLegacyMangling(MangledName))
+      Demangled = rustLegacyDemangle(MangledName);
+    else
+      Demangled = itaniumDemangle(MangledName);
+  } else if (isRustEncoding(MangledName))
     Demangled = rustDemangle(MangledName);
   else if (isDLangEncoding(MangledName))
     Demangled = dlangDemangle(MangledName);
