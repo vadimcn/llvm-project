@@ -141,8 +141,7 @@ void handle_attach(GDBRemoteCommunicationServerLLGS &gdb_server,
 void handle_launch(GDBRemoteCommunicationServerLLGS &gdb_server,
                    llvm::ArrayRef<llvm::StringRef> Arguments) {
   ProcessLaunchInfo info;
-  info.GetFlags().Set(eLaunchFlagStopAtEntry | eLaunchFlagDebug |
-                      eLaunchFlagDisableASLR);
+  info.GetFlags().Set(eLaunchFlagStopAtEntry | eLaunchFlagDebug);
   info.SetArguments(Args(Arguments), true);
 
   llvm::SmallString<64> cwd;

@@ -290,6 +290,7 @@ bool SBReproducer::Generate() {
   auto &r = Reproducer::Instance();
   if (auto generator = r.GetGenerator()) {
     generator->Keep();
+    (void)repro::Finalize(r.GetReproducerPath());
     return true;
   }
   return false;
