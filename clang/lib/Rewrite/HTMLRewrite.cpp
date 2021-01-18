@@ -347,7 +347,7 @@ h1 { font-size:14pt }
 }
 .macro { color: DarkMagenta; }
 
-#tooltiphint {
+.xxx{} #tooltiphint {
   position: fixed;
   width: 50em;
   margin-left: -25em;
