@@ -1,1 +1,0 @@
-set(TARGET_TRIPLE x86_64-linux-gnu)
