@@ -195,6 +195,10 @@ public:
     return m_underlying_type.IsIntegerType(is_signed) && is_signed;
   }
 
+  CompilerType GetUnderlyingType() const {
+    return m_underlying_type;
+  }
+
   bool FindName(uint64_t val, std::string &name) {
     auto iter = m_values.find(val);
     if (iter == m_values.end()) {
@@ -946,10 +950,7 @@ bool TypeSystemRust::IsFloatingPointType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool TypeSystemRust::IsFunctionType(lldb::opaque_compiler_type_t type,
-                                    bool *is_variadic_ptr) {
-  if (is_variadic_ptr)
-    *is_variadic_ptr = false;
+bool TypeSystemRust::IsFunctionType(lldb::opaque_compiler_type_t type) {
   return static_cast<RustType *>(type)->AsFunction() != nullptr;
 }
 
@@ -1075,6 +1076,26 @@ bool TypeSystemRust::IsVoidType(lldb::opaque_compiler_type_t type) {
          tuple->FieldCount() == 0;
 }
 
+bool TypeSystemRust::IsEnumerationType(lldb::opaque_compiler_type_t type,
+                                        bool &is_signed) {
+  is_signed = false;
+  if (type) {
+    RustType *t = static_cast<RustType *>(type);
+    if (t->AsEnum()) {
+      return true;
+    }
+    if (t->AsCLikeEnum()) {
+      return t->AsCLikeEnum()->GetUnderlyingType().IsIntegerType(is_signed);
+    }
+  }
+  return false;
+}
+
+bool TypeSystemRust::IsScopedEnumerationType(lldb::opaque_compiler_type_t type) {
+  bool is_signed;
+  return IsEnumerationType(type, is_signed); // All Rust enums are scoped
+}
+
 bool TypeSystemRust::CanPassInRegisters(const CompilerType &type) {
   // Rust does not have the exception for types with "non-trivial" constructors.
   return true;
@@ -1181,12 +1202,9 @@ unsigned TypeSystemRust::GetTypeQualifiers(lldb::opaque_compiler_type_t type) {
 
 CompilerType
 TypeSystemRust::GetArrayElementType(lldb::opaque_compiler_type_t type,
-                                    uint64_t *stride) {
+                                    ExecutionContextScope *exe_scope) {
   RustArray *array = static_cast<RustType *>(type)->AsArray();
   if (array) {
-    if (stride) {
-      *stride = array->ElementType().GetByteSize(nullptr).getValueOr(0);
-    }
     return array->ElementType();
   }
   return CompilerType();
@@ -1251,6 +1269,16 @@ TypeSystemRust::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
 CompilerType
 TypeSystemRust::GetNonReferenceType(lldb::opaque_compiler_type_t type) {
   return CompilerType(this, type);
+}
+
+CompilerType TypeSystemRust::GetEnumerationIntegerType(lldb::opaque_compiler_type_t type) {
+  if (type) {
+    RustCLikeEnum *t = static_cast<RustType *>(type)->AsCLikeEnum();
+    if (t) {
+      return t->GetUnderlyingType();
+    }
+  }
+  return CompilerType();
 }
 
 CompilerType TypeSystemRust::GetPointeeType(lldb::opaque_compiler_type_t type) {
