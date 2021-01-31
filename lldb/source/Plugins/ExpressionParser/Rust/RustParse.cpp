@@ -232,7 +232,7 @@ ValueObjectSP lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx,
     uint32_t ptr_size = ast->GetPointerByteSize();
     CompilerType type =
         ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
-    Scalar size(val->GetByteSize());
+    Scalar size(val->GetByteSize().getValueOr(0));
     return CreateValueFromScalar(exe_ctx, size, type, error);
   }
   return ValueObjectSP();
@@ -271,20 +271,11 @@ ValueObjectSP lldb_private::rust::BinaryOperation(ExecutionContext &exe_ctx,
 
   // FIXME there has to be a better way.
   switch (result.GetType()) {
-  case Scalar::e_sint:
-  case Scalar::e_slong:
-  case Scalar::e_slonglong:
-    type = ast->CreateIntrinsicIntegralType(true, byte_size);
+  case Scalar::e_int:
+    type = ast->CreateIntrinsicIntegralType(result.IsSigned(), byte_size);
     break;
-
-  case Scalar::e_uint:
-  case Scalar::e_ulong:
-  case Scalar::e_ulonglong:
-    type = ast->CreateIntrinsicIntegralType(false, byte_size);
-    break;
-
+    
   case Scalar::e_float:
-  case Scalar::e_double:
     if (byte_size == 4) {
       type = ast->CreateFloatType(ConstString("f32"), byte_size);
       break;
