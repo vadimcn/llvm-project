@@ -65,22 +65,8 @@ jobs:
     condition: always()
 
   - script: |
-      git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)\
-        -DCMAKE_BUILD_TYPE=MinSizeRel\
-        -DCMAKE_TOOLCHAIN_FILE=toolchain-$(Triple).cmake\
-        -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)\
-        -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)\
-        -DRELEASE_PACKAGE=TRUE\
-        -DPYTHON_STANDALONE=$(buildTools)/python
-    displayName: 'Configure'
-
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-    displayName: 'Build Dependencies'
-    
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
+      git -C $(llvmProject) remote set-url origin local
+      python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -108,10 +94,14 @@ jobs:
 
 - job: OSX
   pool:
-    vmImage: 'macOS-10.14'
+    vmImage: 'macOS-10.15'
 
-  variables:
-    Triple: 'x86_64-apple-darwin'
+  strategy:
+    matrix:
+      x86_64:
+        Triple: 'x86_64-apple-darwin'
+      aarch64:
+        Triple: 'aarch64-apple-darwin'
 
   timeoutInMinutes: 360
 
@@ -151,22 +141,8 @@ jobs:
     condition: always()
 
   - script: |
-      git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)\
-         -DCMAKE_BUILD_TYPE=MinSizeRel\
-         -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)\
-         -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)\
-         -DRELEASE_PACKAGE=TRUE\
-         -DPYTHON_STANDALONE=$(buildTools)/python
-    displayName: 'Configure'
-
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-    displayName: 'Build Dependencies'
-
-  - script: |
-      cp $XCODE_10_DEVELOPER_DIR/../SharedFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/lldb/bin/debugserver
-      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
+      git -C $(llvmProject) remote set-url origin local
+      xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -177,7 +153,7 @@ jobs:
  
   - task: PublishBuildArtifacts@1
     inputs:
-      artifactName: 'lldb--x86_64-apple-darwin'
+      artifactName: 'lldb--$(Triple)'
 
   - script: |
       cd $(Agent.BuildDirectory)
@@ -249,21 +225,8 @@ jobs:
     condition: always()
 
   - script: |
-      git remote set-url origin local
-      cd $(Agent.BuildDirectory) && cmake -GNinja $(llvmProject)^
-         -DCMAKE_BUILD_TYPE=MinSizeRel^
-         -DCMAKE_C_COMPILER_LAUNCHER=$(SCCACHE)^
-         -DCMAKE_CXX_COMPILER_LAUNCHER=$(SCCACHE)^
-         -DRELEASE_PACKAGE=TRUE^
-         -DPYTHON_STANDALONE=$(buildTools)/python
-    displayName: 'Configure'
-
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target lldb-configure -- -v
-    displayName: 'Build Dependencies'
-
-  - script: |
-      cmake --build $(Agent.BuildDirectory) --target package_lldb -- -v
+      git -C $(llvmProject) remote set-url origin local
+      python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -274,7 +237,7 @@ jobs:
 
   - task: PublishBuildArtifacts@1
     inputs:
-      artifactName: 'lldb--x86_64-windows-msvc'
+      artifactName: 'lldb--$(Triple)'
 
   - script: |
       cd $(Agent.BuildDirectory)
