@@ -281,7 +281,7 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
 
   ConstString type_name_const_str = compiler_type.GetTypeName();
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str,
-                          element_type->GetByteSize(), NULL, type_die_id,
+                          element_type->GetByteSize(NULL).getValueOr(0), NULL, type_die_id,
                           Type::eEncodingIsUID, Declaration(), compiler_type,
                           Type::ResolveState::Full));
   type_sp->SetEncodingType(element_type);
