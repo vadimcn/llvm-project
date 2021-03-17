@@ -215,7 +215,7 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log,
     // to treat Rust references as CompilerType references.
   case DW_TAG_typedef:
     type_name_const_str = FullyQualify(type_name_const_str, die);
-    // Fall through.
+    [[clang::fallthrough]];
   case DW_TAG_pointer_type:
   case DW_TAG_template_type_parameter: {
     Type *type = dwarf->ResolveTypeUID(encoding_uid);

@@ -86,7 +86,7 @@ public:
                                 bool *is_instance_method_ptr,
                                 ConstString *language_object_name_ptr) override;
   bool DeclContextIsContainedInLookup(void *opaque_decl_ctx,
-                                      void *other_opaque_decl_ctx);
+                                      void *other_opaque_decl_ctx) override;
 
   //----------------------------------------------------------------------
   // Creating Types
