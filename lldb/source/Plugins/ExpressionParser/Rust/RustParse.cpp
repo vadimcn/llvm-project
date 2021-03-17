@@ -283,7 +283,7 @@ ValueObjectSP lldb_private::rust::BinaryOperation(ExecutionContext &exe_ctx,
       type = ast->CreateFloatType(ConstString("f64"), byte_size);
       break;
     }
-    /* FALL THROUGH */
+    [[clang::fallthrough]];
 
   default:
     error.SetErrorString("unknown type resulting from binary operation");
