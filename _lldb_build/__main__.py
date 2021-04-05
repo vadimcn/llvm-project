@@ -109,7 +109,7 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
     cmake_args = {
         'CMAKE_BUILD_TYPE': build_type,
         'LLVM_ENABLE_PROJECTS': 'clang;libcxx;lldb',
-        'LLVM_TARGETS_TO_BUILD': 'X86;AArch64;ARM',
+        'LLVM_TARGETS_TO_BUILD': 'AArch64;ARM;AVR;MSP430;RISCV;X86;WebAssembly',
         'LLVM_PARALLEL_LINK_JOBS': '1',
         'LLVM_VERSION_SUFFIX': '-custom',
         'LLVM_APPEND_VC_REV': 'FALSE',
