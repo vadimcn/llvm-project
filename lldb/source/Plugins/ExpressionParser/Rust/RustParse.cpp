@@ -720,9 +720,10 @@ lldb::ValueObjectSP RustPathExpression::Evaluate(ExecutionContext &exe_ctx,
       }
     }
   }
-  if (decl) {
-    return frame->TrackGlobalVariable(decl, eDynamicDontRunTarget);
-  }
+  // TrackGlobalVariable was removed in 13
+  // if (decl) {
+  //   return frame->TrackGlobalVariable(decl, eDynamicDontRunTarget);
+  // }
 
   if (function) {
     Address addr = function->GetAddressRange().GetBaseAddress();

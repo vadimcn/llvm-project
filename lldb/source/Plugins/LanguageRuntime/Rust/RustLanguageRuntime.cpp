@@ -66,7 +66,7 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
     TypeAndOrName &class_type_or_name, Address &dynamic_address,
     Value::ValueType &value_type) {
   class_type_or_name.Clear();
-  value_type = Value::ValueType::eValueTypeScalar;
+  value_type = Value::ValueType::Scalar;
 
   CompilerType type = in_value.GetCompilerType();
   TypeSystemRust *ast =
@@ -103,7 +103,7 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
     class_type_or_name = TypeAndOrName(variant_type);
     // The address doesn't change.
     dynamic_address.SetLoadAddress(original_ptr, exe_ctx.GetTargetPtr());
-    value_type = Value::ValueType::eValueTypeLoadAddress;
+    value_type = Value::ValueType::LoadAddress;
 
     return true;
   }
