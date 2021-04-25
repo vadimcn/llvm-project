@@ -165,6 +165,7 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
         print(' ', a)
 
     os.environ['SWIG_LIB'] = str(swig_dir / 'Lib')
+    os.environ['PATH'] = str(python_exe.parent) + ':' + os.environ['PATH']
 
     check_call(['cmake', '-GNinja', str(llvm_src), '-B', str(llvm_build)] + cmake_args)
 
