@@ -84,7 +84,7 @@ jobs:
       cat /proc/cpuinfo > system.log
       cat /proc/meminfo >> system.log
       env > env.log
-      find $(Agent.BuildDirectory) -type d > tree.log
+      find $(Agent.BuildDirectory) -type d > build-tree.log
       zip --recurse-patterns $(Agent.BuildDirectory)/$(Triple).zip "*.log" "CMakeCache.txt"
       echo "##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)/$(Triple).zip"
     displayName: 'Logs'
@@ -93,17 +93,19 @@ jobs:
 ############################################################
 
 - job: OSX
-  pool:
-    vmImage: 'macOS-10.15'
-
   strategy:
     matrix:
       x86_64:
+        DeploymentTarget: '10.10'
         Triple: 'x86_64-apple-darwin'
       aarch64:
+        DeploymentTarget: '11.0'
         Triple: 'aarch64-apple-darwin'
 
   timeoutInMinutes: 360
+
+  pool:
+    vmImage: 'macOS-10.15'
 
   steps:
   - checkout: self
@@ -141,9 +143,20 @@ jobs:
     condition: always()
 
   - script: |
-      git -C $(llvmProject) remote set-url origin local
+      mkdir -p $(Agent.BuildDirectory)/llvm/bin
+      cp $(buildTools)/bin/debugserver $(Agent.BuildDirectory)/llvm/bin/debugserver
+    displayName: PreBuild
+    condition: eq(variables['Triple'], 'x86_64-apple-darwin')
+
+  - script: |
       mkdir -p $(Agent.BuildDirectory)/llvm/bin
       cp /Library/Developer/CommandLineTools/Library/PrivateFrameworks/LLDB.framework/Versions/A/Resources/debugserver $(Agent.BuildDirectory)/llvm/bin/debugserver
+    displayName: 'PreBuild'
+    condition: eq(variables['Triple'], 'aarch64-apple-darwin')
+
+  - script: |
+      git -C $(llvmProject) remote set-url origin local
+      export MACOSX_DEPLOYMENT_TARGET=$(DeploymentTarget)
       xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
     displayName: 'Build'
 
@@ -161,7 +174,10 @@ jobs:
       cd $(Agent.BuildDirectory)
       sysctl -a > system.log
       env > env.log
-      find $(Agent.BuildDirectory) -type d > tree.log
+      find $(Agent.BuildDirectory) -type d > build-tree.log
+      xcversion selected > xcversion-selected.log
+      xcversion list > xcversion-list.log
+      xcodebuild -showsdks > xcodebuild-sdks.log
       zip --recurse-patterns $(Agent.BuildDirectory)/$(Triple).zip "*.log" "CMakeCache.txt"
       echo "##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)/$(Triple).zip"
     displayName: 'Logs'
@@ -244,7 +260,7 @@ jobs:
   - script: |
       cd $(Agent.BuildDirectory)
       set > env.log
-      tree /a > tree.log
+      tree /a > build-tree.log
       zip --recurse-patterns $(Agent.BuildDirectory)\$(Triple).zip "*.log" "CMakeCache.txt"
       echo ##vso[artifact.upload artifactname=logs;]$(Agent.BuildDirectory)\$(Triple).zip
     displayName: 'Logs'
