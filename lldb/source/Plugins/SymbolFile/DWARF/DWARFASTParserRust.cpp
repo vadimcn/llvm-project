@@ -843,6 +843,7 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
   ConstString type_name_const_str;
   SymbolFileDWARF *dwarf = die.GetDWARF();
   CompilerType underlying_type;
+  uint64_t byte_size = 0;
 
   for (auto &&attr : IterableDIEAttrs(die)) {
     switch (attr.first) {
@@ -856,7 +857,16 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
         underlying_type = type->GetFullCompilerType();
       }
       break;
+
+    case DW_AT_byte_size:
+      byte_size = attr.second.Unsigned();
+      break;
     }
+  }
+
+  // DWARF permits omitting DW_AT_type when DW_AT_byte_size is present
+  if (!underlying_type && byte_size != 0) {
+    underlying_type = m_ast.CreateIntrinsicIntegralType(false, byte_size);
   }
 
   // See the comment by m_discriminant to understand this; but this
@@ -887,17 +897,17 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
         value = attr.second.Unsigned();
         break;
       }
-
-      if (saw_value && !name.empty()) {
-        values[value] = name;
-      } else {
-        dwarf->GetObjectFile()->GetModule()->LogMessage(
-            log,
-            "DWARFASTParserRust::ParseCLikeEnum (die = 0x%8.8x) %s "
-            "is invalid)",
-            child_die.GetOffset(), DW_TAG_value_to_name(die.Tag()));
-      }
     }
+
+    if (saw_value && !name.empty()) {
+      values[value] = name;
+    } else {
+      dwarf->GetObjectFile()->GetModule()->LogMessage(
+          log,
+          "DWARFASTParserRust::ParseCLikeEnum (die = 0x%8.8x) %s "
+          "is invalid)",
+          child_die.GetOffset(), DW_TAG_value_to_name(die.Tag()));
+    } 
   }
 
   Declaration decl;
