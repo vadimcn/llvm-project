@@ -124,7 +124,8 @@ public:
 
   void AddThread(Thread &thread) {
     lldb::tid_t tid = thread.GetID();
-    m_plans_list.emplace(tid, thread);
+    m_plans_list.emplace(std::piecewise_construct, std::forward_as_tuple(tid),
+                         std::forward_as_tuple(thread));
   }
 
   bool RemoveTID(lldb::tid_t tid) {
