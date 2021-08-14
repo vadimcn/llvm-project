@@ -96,6 +96,8 @@
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
+#pragma clang optimize off // Work around a crash in clang ARM codegen 
+
 #define DEBUG_TYPE "aarch64-lower"
 
 STATISTIC(NumTailCalls, "Number of tail calls");
