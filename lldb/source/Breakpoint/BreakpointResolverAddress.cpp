@@ -97,8 +97,12 @@ void BreakpointResolverAddress::ResolveBreakpoint(SearchFilter &filter) {
   bool re_resolve = false;
   if (m_addr.GetSection() || m_module_filespec)
     re_resolve = true;
-  else if (GetBreakpoint()->GetNumLocations() == 0)
-    re_resolve = true;
+  else {
+    BreakpointSP breakpoint = GetBreakpoint();
+    if (breakpoint->GetNumLocations() == 0 ||
+        breakpoint->GetNumResolvedLocations() < breakpoint->GetNumLocations())
+      re_resolve = true;
+  }
 
   if (re_resolve)
     BreakpointResolver::ResolveBreakpoint(filter);
@@ -110,8 +114,12 @@ void BreakpointResolverAddress::ResolveBreakpointInModules(
   bool re_resolve = false;
   if (m_addr.GetSection())
     re_resolve = true;
-  else if (GetBreakpoint()->GetNumLocations() == 0)
-    re_resolve = true;
+  else {
+    BreakpointSP breakpoint = GetBreakpoint();
+    if (breakpoint->GetNumLocations() == 0 ||
+        breakpoint->GetNumResolvedLocations() < breakpoint->GetNumLocations())
+      re_resolve = true;
+  }
 
   if (re_resolve)
     BreakpointResolver::ResolveBreakpointInModules(filter, modules);
@@ -151,7 +159,7 @@ Searcher::CallbackReturn BreakpointResolverAddress::SearchCallback(
       BreakpointLocationSP loc_sp = breakpoint.GetLocationAtIndex(0);
       lldb::addr_t cur_load_location =
           m_addr.GetLoadAddress(&breakpoint.GetTarget());
-      if (cur_load_location != m_resolved_addr) {
+      if (cur_load_location != m_resolved_addr || !loc_sp->IsResolved()) {
         m_resolved_addr = cur_load_location;
         loc_sp->ClearBreakpointSite();
         loc_sp->ResolveBreakpointSite();
