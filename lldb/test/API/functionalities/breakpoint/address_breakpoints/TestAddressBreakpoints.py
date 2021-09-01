@@ -79,10 +79,33 @@ class AddressBreakpointTestCase(TestBase):
         process = target.Launch(launch_info, error)
         self.assertTrue(process, PROCESS_IS_VALID)
 
-        thread = get_threads_stopped_at_breakpoint(process, breakpoint)
+        threads = get_threads_stopped_at_breakpoint(process, breakpoint)
         self.assertEqual(
             len(threads), 1,
             "There should be a thread stopped at our breakpoint")
 
         # The hit count for the breakpoint should now be 2.
         self.assertEquals(breakpoint.GetHitCount(), 2)
+
+        process.Kill()
+
+        # Create a breakpoint again, this time using the load address
+        load_address = address.GetLoadAddress(target)
+
+        # Re-create the target to make sure that nothing is cached
+        target = self.createTestTarget()
+        breakpoint = target.BreakpointCreateByAddress(load_address)
+
+        launch_info.Clear()
+        launch_info.SetLaunchFlags(flags)
+
+        process = target.Launch(launch_info, error)
+        self.assertTrue(process, PROCESS_IS_VALID)
+
+        threads = get_threads_stopped_at_breakpoint(process, breakpoint)
+        self.assertEqual(
+            len(threads), 1,
+            "There should be a thread stopped at our breakpoint")
+
+        # The hit count for the breakpoint should be 1.
+        self.assertEquals(breakpoint.GetHitCount(), 1)
