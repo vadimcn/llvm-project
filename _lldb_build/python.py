@@ -18,7 +18,9 @@ def build_lldb_python(python_dist: Path, output: Path, cfg: TargetConfig):
     def should_include(name: str, ext: Dict[str, Any]):
         if ext['required']:
             return True
-        if name in ['_ctypes', '_socket', '_ssl', '_scproxy', 'select', 'zlib']:  # Needed for codelldb or pip.
+        if name in ['_ctypes', '_socket', '_ssl', '_scproxy', 'select', 'zlib', # Needed for codelldb or pip.
+                    '_bz2', '_lzma', # For pandas.
+                    '_json']:
             return True
         allowed_libs = ['intl', 'iconv']  # For some reason these are linked to most extensions on Mac.
         extra_libs = [lib for lib in ext.get('links', []) if lib['name'] not in allowed_libs]
