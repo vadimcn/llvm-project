@@ -28,7 +28,7 @@ def build_libxml2(work_dir: Path, cfg: TargetConfig):
     libxml2_build = libxml2_src / 'build'
     libxml2_build.mkdir(exist_ok=True)
     libxml2_install = libxml2_src / 'install'
-    libname = 'xml2.lib' if cfg['CMAKE_SYSTEM_NAME'] == 'Windows' else 'libxml2.a'
+    libname = 'libxml2sd.lib' if cfg['CMAKE_SYSTEM_NAME'] == 'Windows' else 'libxml2.a'
     libxml2_lib = libxml2_install / 'lib' / libname
 
     if out_of_date([libxml2_lib], [libxml2_src / '*.c', libxml2_src / '*.h']):
@@ -86,7 +86,7 @@ def build_libxml2(work_dir: Path, cfg: TargetConfig):
     return (libxml2_install / 'include/libxml2'), libxml2_lib
 
 
-def build_swig(work_dir: Path):
+def build_swig(work_dir: Path, cfg: TargetConfig):
     swig_src = work_dir / 'swig'
     exename = 'swig' if 'win32' not in sys.platform else 'swig.exe'
     swig_exe = swig_src / exename
@@ -94,8 +94,9 @@ def build_swig(work_dir: Path):
         check_call(['git', 'clone', '--branch=py3-stable-abi', '--depth=1',
                     'https://github.com/vadimcn/swig.git', str(swig_src)])
     if out_of_date([swig_exe], [swig_src / '*.c', swig_src / '*.h']):
-        check_call(['bash', './autogen.sh'], cwd=str(swig_src))
-        check_call(['bash', './configure', '--prefix=' + str(swig_src)], cwd=str(swig_src))
+        shell = cfg['CMAKE_SYSTEM_NAME'] == 'Windows'
+        check_call(['bash', './autogen.sh'], shell=shell, cwd=str(swig_src))
+        check_call(['bash', './configure', '--prefix=' + str(swig_src)], shell=shell, cwd=str(swig_src))
         check_call(['make'], cwd=str(swig_src))
     return swig_exe, swig_src
 
@@ -161,13 +162,19 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
             'LLVM_ENABLE_ZLIB': 'FORCE_ON'
         })
 
+    if cfg['CMAKE_SYSTEM_NAME'] == 'Windows':
+        cmake_args.update({
+            'CMAKE_C_FLAGS': '-DLIBXML_STATIC=1',
+            'CMAKE_CXX_FLAGS': '-DLIBXML_STATIC=1'
+        })
+
     cmake_args = dict_to_cmake(cmake_args)
     print('Configuring LLVM with:')
     for a in cmake_args:
         print(' ', a)
 
     os.environ['SWIG_LIB'] = str(swig_dir / 'Lib')
-    os.environ['PATH'] = str(python_exe.parent) + ':' + os.environ['PATH']
+    os.environ['PATH'] = str(python_exe.parent) + os.pathsep + os.environ['PATH']
 
     check_call(['cmake', '-GNinja', str(llvm_src), '-B', str(llvm_build)] + cmake_args)
 
@@ -200,7 +207,7 @@ def main(args: Any):
 
     libxml_inc, libxml_lib = build_libxml2(work_dir, cfg)
 
-    swig_exe, swig_dir = build_swig(work_dir)
+    swig_exe, swig_dir = build_swig(work_dir, cfg)
 
     lldb_root = build_lldb(work_dir, cfg, args.build_type,
                            ccache=args.ccache,
