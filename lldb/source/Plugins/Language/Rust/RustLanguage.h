@@ -36,13 +36,11 @@ public:
 
   static lldb_private::Language *CreateInstance(lldb::LanguageType language);
 
-  static lldb_private::ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic();
 
   bool IsSourceFile(llvm::StringRef file_path) const override;
 
-  ConstString GetPluginName() override;
-
-  uint32_t GetPluginVersion() override;
+  llvm::StringRef GetPluginName() override;
 };
 
 } // namespace lldb_private

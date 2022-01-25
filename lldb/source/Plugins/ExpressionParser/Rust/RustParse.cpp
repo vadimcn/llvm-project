@@ -8,8 +8,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "RustParse.h"
-#include "lldb/Core/PluginManager.h"
 #include "lldb/Core/Module.h"
+#include "lldb/Core/PluginManager.h"
 #include "lldb/Core/ValueObject.h"
 #include "lldb/Expression/DiagnosticManager.h"
 #include "lldb/Symbol/Block.h"
@@ -274,7 +274,7 @@ ValueObjectSP lldb_private::rust::BinaryOperation(ExecutionContext &exe_ctx,
   case Scalar::e_int:
     type = ast->CreateIntrinsicIntegralType(result.IsSigned(), byte_size);
     break;
-    
+
   case Scalar::e_float:
     if (byte_size == 4) {
       type = ast->CreateFloatType(ConstString("f32"), byte_size);
@@ -522,9 +522,12 @@ bool RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
     if (found_ns) {
       mod->FindGlobalVariables(cs_name, found_ns, 1, var_list);
 
+      ModuleFunctionSearchOptions function_options;
+      function_options.include_symbols = false;
+      function_options.include_inlines = false;
       SymbolContextList context_list;
-      mod->FindFunctions(cs_name, found_ns, eFunctionNameTypeBase, false, false,
-                         context_list);
+      mod->FindFunctions(cs_name, found_ns, eFunctionNameTypeBase,
+                         function_options, context_list);
       for (size_t i = 0; i < context_list.GetSize(); ++i) {
         SymbolContext sym_context;
         if (context_list.GetContextAtIndex(i, sym_context) &&
