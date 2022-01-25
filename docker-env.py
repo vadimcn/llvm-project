@@ -31,5 +31,7 @@ check_call(['docker', 'run', '-it',  '--privileged',
             '-w' '/workspace/build',
             '-u' '1000:1000',
             '-v' '/etc/passwd:/etc/passwd',
+            '--memory=16G',
+            '--cpus=10',
             'vadimcn/linux-builder:latest',
             'bash', '-c', 'export PATH=/workspace/build-tools/bin:$PATH; bash'])
