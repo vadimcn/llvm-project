@@ -35,6 +35,7 @@
 #include "lldb/Target/ThreadPlanCallFunction.h"
 #include "lldb/Utility/DataExtractor.h"
 #include "lldb/Utility/Log.h"
+//TODO(v15):#include "lldb/Utility/LLDBLog.h"
 #include "lldb/Utility/State.h"
 
 using namespace lldb_private;
@@ -182,6 +183,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   m_wrapper_function_text.append(");\n}\n");
 
   Log *log(lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_EXPRESSIONS));
+  //TODO(v15): Log *log = GetLog(LLDBLog::Expressions);
   if (log)
     log->Printf("Expression: \n\n%s\n\n", m_wrapper_function_text.c_str());
 

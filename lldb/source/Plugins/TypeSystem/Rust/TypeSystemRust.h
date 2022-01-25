@@ -41,11 +41,9 @@ public:
   //------------------------------------------------------------------
   // PluginInterface functions
   //------------------------------------------------------------------
-  ConstString GetPluginName() override;
+  llvm::StringRef GetPluginName() override;
 
-  uint32_t GetPluginVersion() override;
-
-  static ConstString GetPluginNameStatic();
+  static llvm::StringRef GetPluginNameStatic();
 
   static lldb::TypeSystemSP CreateInstance(lldb::LanguageType language,
                                            Module *module, Target *target);
@@ -200,7 +198,8 @@ public:
 
   bool IsVoidType(lldb::opaque_compiler_type_t type) override;
 
-  bool IsEnumerationType(lldb::opaque_compiler_type_t type, bool &is_signed) override;
+  bool IsEnumerationType(lldb::opaque_compiler_type_t type,
+                         bool &is_signed) override;
 
   bool IsScopedEnumerationType(lldb::opaque_compiler_type_t type) override;
 
@@ -367,7 +366,7 @@ public:
   //----------------------------------------------------------------------
 #ifndef NDEBUG
   LLVM_DUMP_METHOD void dump(lldb::opaque_compiler_type_t type) const override {
-    const_cast<TypeSystemRust*>(this)->DumpTypeDescription(type);
+    const_cast<TypeSystemRust *>(this)->DumpTypeDescription(type);
   }
 #endif
 
@@ -397,6 +396,8 @@ public:
   void DumpSummary(lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx,
                    Stream *s, const DataExtractor &data,
                    lldb::offset_t data_offset, size_t data_byte_size) override;
+
+  void Dump(llvm::raw_ostream &output) override {}
 
   bool IsPointerOrReferenceType(lldb::opaque_compiler_type_t type,
                                 CompilerType *pointee_type = nullptr) override;
@@ -434,7 +435,8 @@ public:
 
   CompilerType GetNonReferenceType(lldb::opaque_compiler_type_t type) override;
 
-  CompilerType GetEnumerationIntegerType(lldb::opaque_compiler_type_t type) override;
+  CompilerType
+  GetEnumerationIntegerType(lldb::opaque_compiler_type_t type) override;
 
   bool IsReferenceType(lldb::opaque_compiler_type_t type,
                        CompilerType *pointee_type = nullptr,

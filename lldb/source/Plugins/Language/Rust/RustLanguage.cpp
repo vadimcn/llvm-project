@@ -18,12 +18,12 @@
 #include "llvm/Support/Threading.h"
 
 // Project includes
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 #include "RustLanguage.h"
 #include "lldb/Core/PluginManager.h"
 #include "lldb/DataFormatters/DataVisualization.h"
 #include "lldb/DataFormatters/FormattersHelpers.h"
 #include "lldb/Utility/ConstString.h"
-#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -40,16 +40,9 @@ void RustLanguage::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
-lldb_private::ConstString RustLanguage::GetPluginNameStatic() {
-  static ConstString g_name("Rust");
-  return g_name;
-}
+llvm::StringRef RustLanguage::GetPluginNameStatic() { return "Rust"; }
 
-lldb_private::ConstString RustLanguage::GetPluginName() {
-  return GetPluginNameStatic();
-}
-
-uint32_t RustLanguage::GetPluginVersion() { return 1; }
+llvm::StringRef RustLanguage::GetPluginName() { return GetPluginNameStatic(); }
 
 Language *RustLanguage::CreateInstance(lldb::LanguageType language) {
   if (language == eLanguageTypeRust)
