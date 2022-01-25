@@ -195,9 +195,7 @@ public:
     return m_underlying_type.IsIntegerType(is_signed) && is_signed;
   }
 
-  CompilerType GetUnderlyingType() const {
-    return m_underlying_type;
-  }
+  CompilerType GetUnderlyingType() const { return m_underlying_type; }
 
   bool FindName(uint64_t val, std::string &name) {
     auto iter = m_values.find(val);
@@ -825,15 +823,11 @@ TypeSystemRust::~TypeSystemRust() {}
 // PluginInterface functions
 //------------------------------------------------------------------
 
-ConstString TypeSystemRust::GetPluginNameStatic() {
-  return ConstString("rust");
-}
+llvm::StringRef TypeSystemRust::GetPluginNameStatic() { return "rust"; }
 
-ConstString TypeSystemRust::GetPluginName() {
+llvm::StringRef TypeSystemRust::GetPluginName() {
   return TypeSystemRust::GetPluginNameStatic();
 }
-
-uint32_t TypeSystemRust::GetPluginVersion() { return 1; }
 
 lldb::TypeSystemSP TypeSystemRust::CreateInstance(lldb::LanguageType language,
                                                   Module *module,
@@ -876,9 +870,7 @@ void TypeSystemRust::Terminate() {
 //----------------------------------------------------------------------
 
 #ifndef NDEBUG
-bool TypeSystemRust::Verify(lldb::opaque_compiler_type_t type) {
-  return true;
-}
+bool TypeSystemRust::Verify(lldb::opaque_compiler_type_t type) { return true; }
 #endif
 
 bool TypeSystemRust::IsArrayType(lldb::opaque_compiler_type_t type,
@@ -1077,7 +1069,7 @@ bool TypeSystemRust::IsVoidType(lldb::opaque_compiler_type_t type) {
 }
 
 bool TypeSystemRust::IsEnumerationType(lldb::opaque_compiler_type_t type,
-                                        bool &is_signed) {
+                                       bool &is_signed) {
   is_signed = false;
   if (type) {
     RustType *t = static_cast<RustType *>(type);
@@ -1091,7 +1083,8 @@ bool TypeSystemRust::IsEnumerationType(lldb::opaque_compiler_type_t type,
   return false;
 }
 
-bool TypeSystemRust::IsScopedEnumerationType(lldb::opaque_compiler_type_t type) {
+bool TypeSystemRust::IsScopedEnumerationType(
+    lldb::opaque_compiler_type_t type) {
   bool is_signed;
   return IsEnumerationType(type, is_signed); // All Rust enums are scoped
 }
@@ -1271,7 +1264,8 @@ TypeSystemRust::GetNonReferenceType(lldb::opaque_compiler_type_t type) {
   return CompilerType(this, type);
 }
 
-CompilerType TypeSystemRust::GetEnumerationIntegerType(lldb::opaque_compiler_type_t type) {
+CompilerType
+TypeSystemRust::GetEnumerationIntegerType(lldb::opaque_compiler_type_t type) {
   if (type) {
     RustCLikeEnum *t = static_cast<RustType *>(type)->AsCLikeEnum();
     if (t) {

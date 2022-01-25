@@ -281,9 +281,9 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
 
   ConstString type_name_const_str = compiler_type.GetTypeName();
   TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str,
-                          element_type->GetByteSize(NULL).getValueOr(0), NULL, type_die_id,
-                          Type::eEncodingIsUID, Declaration(), compiler_type,
-                          Type::ResolveState::Full));
+                          element_type->GetByteSize(NULL).getValueOr(0), NULL,
+                          type_die_id, Type::eEncodingIsUID, Declaration(),
+                          compiler_type, Type::ResolveState::Full));
   type_sp->SetEncodingType(element_type);
   return type_sp;
 }
@@ -907,7 +907,7 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
           "DWARFASTParserRust::ParseCLikeEnum (die = 0x%8.8x) %s "
           "is invalid)",
           child_die.GetOffset(), DW_TAG_value_to_name(die.Tag()));
-    } 
+    }
   }
 
   Declaration decl;
@@ -932,8 +932,7 @@ DWARFASTParserRust::ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
   if (die) {
     SymbolFileDWARF *dwarf = die.GetDWARF();
 
-    Log *log(LogChannelDWARF::GetLogIfAny(DWARF_LOG_TYPE_COMPLETION |
-                                          DWARF_LOG_LOOKUPS));
+    Log *log = GetLog(DWARFLog::TypeCompletion | DWARFLog::Lookups);
     if (log) {
       dwarf->GetObjectFile()->GetModule()->LogMessage(
           log,
@@ -1027,8 +1026,10 @@ bool DWARFASTParserRust::CompleteTypeFromDWARF(const DWARFDIE &die,
   return bool(die);
 }
 
-Function *DWARFASTParserRust::ParseFunctionFromDWARF(CompileUnit &comp_unit,
-                                                     const DWARFDIE &die) {
+Function *DWARFASTParserRust::ParseFunctionFromDWARF(
+    CompileUnit &comp_unit, const DWARFDIE &die,
+    const lldb_private::AddressRange &func_range) {
+  assert(func_range.GetBaseAddress().IsValid());
   DWARFRangeList func_ranges;
   const char *name = NULL;
   const char *mangled = NULL;
@@ -1045,51 +1046,33 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(CompileUnit &comp_unit,
   if (die.GetDIENamesAndRanges(name, mangled, func_ranges, decl_file, decl_line,
                                decl_column, call_file, call_line, call_column,
                                &frame_base)) {
-    // Union of all ranges in the function DIE (if the function is
-    // discontiguous)
-    AddressRange func_range;
-    lldb::addr_t lowest_func_addr = func_ranges.GetMinRangeBase(0);
-    lldb::addr_t highest_func_addr = func_ranges.GetMaxRangeEnd(0);
-    if (lowest_func_addr != LLDB_INVALID_ADDRESS &&
-        lowest_func_addr <= highest_func_addr) {
-      ModuleSP module_sp(die.GetModule());
-      func_range.GetBaseAddress().ResolveAddressUsingFileSections(
-          lowest_func_addr, module_sp->GetSectionList());
-      if (func_range.GetBaseAddress().IsValid())
-        func_range.SetByteSize(highest_func_addr - lowest_func_addr);
-    }
+    Mangled func_name;
+    func_name.SetValue(ConstString(name), false);
 
-    if (func_range.GetBaseAddress().IsValid()) {
-      Mangled func_name;
-      func_name.SetValue(ConstString(name), false);
+    FunctionSP func_sp;
+    std::unique_ptr<Declaration> decl_ap;
+    if (decl_file != 0 || decl_line != 0 || decl_column != 0)
+      decl_ap.reset(new Declaration(
+          comp_unit.GetSupportFiles().GetFileSpecAtIndex(decl_file), decl_line,
+          decl_column));
 
-      FunctionSP func_sp;
-      std::unique_ptr<Declaration> decl_ap;
-      if (decl_file != 0 || decl_line != 0 || decl_column != 0)
-        decl_ap.reset(new Declaration(
-            comp_unit.GetSupportFiles().GetFileSpecAtIndex(decl_file),
-            decl_line, decl_column));
+    SymbolFileDWARF *dwarf = die.GetDWARF();
+    // Supply the type _only_ if it has already been parsed
+    Type *func_type = dwarf->m_die_to_type.lookup(die.GetDIE());
 
-      SymbolFileDWARF *dwarf = die.GetDWARF();
-      // Supply the type _only_ if it has already been parsed
-      Type *func_type = dwarf->m_die_to_type.lookup(die.GetDIE());
+    assert(func_type == NULL || func_type != DIE_IS_BEING_PARSED);
 
-      assert(func_type == NULL || func_type != DIE_IS_BEING_PARSED);
+    const user_id_t func_user_id = die.GetID();
+    func_sp.reset(new Function(&comp_unit,
+                               func_user_id, // UserID is the DIE offset
+                               func_user_id, func_name, func_type,
+                               func_range)); // first address range
 
-      if (dwarf->FixupAddress(func_range.GetBaseAddress())) {
-        const user_id_t func_user_id = die.GetID();
-        func_sp.reset(new Function(&comp_unit,
-                                   func_user_id, // UserID is the DIE offset
-                                   func_user_id, func_name, func_type,
-                                   func_range)); // first address range
-
-        if (func_sp.get() != NULL) {
-          if (frame_base.IsValid())
-            func_sp->GetFrameBaseExpression() = frame_base;
-          comp_unit.AddFunction(func_sp);
-          return func_sp.get();
-        }
-      }
+    if (func_sp.get() != NULL) {
+      if (frame_base.IsValid())
+        func_sp->GetFrameBaseExpression() = frame_base;
+      comp_unit.AddFunction(func_sp);
+      return func_sp.get();
     }
   }
   return NULL;
