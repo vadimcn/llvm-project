@@ -9,6 +9,7 @@
 
 #include "RustLanguageRuntime.h"
 
+#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 #include "lldb/Core/PluginManager.h"
 #include "lldb/Symbol/Symbol.h"
 #include "lldb/Symbol/SymbolContext.h"
@@ -18,7 +19,6 @@
 #include "lldb/Target/SectionLoadList.h"
 #include "lldb/Target/Target.h"
 #include "llvm/ADT/StringRef.h"
-#include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
 
 LLDB_PLUGIN_DEFINE(RustLanguageRuntime)
 
@@ -45,16 +45,11 @@ void RustLanguageRuntime::Terminate() {
   PluginManager::UnregisterPlugin(CreateInstance);
 }
 
-lldb_private::ConstString RustLanguageRuntime::GetPluginNameStatic() {
-  static ConstString g_name("rust");
-  return g_name;
-}
+llvm::StringRef RustLanguageRuntime::GetPluginNameStatic() { return "rust"; }
 
-lldb_private::ConstString RustLanguageRuntime::GetPluginName() {
+llvm::StringRef RustLanguageRuntime::GetPluginName() {
   return GetPluginNameStatic();
 }
-
-uint32_t RustLanguageRuntime::GetPluginVersion() { return 1; }
 
 bool RustLanguageRuntime::CouldHaveDynamicValue(ValueObject &in_value) {
   return in_value.GetCompilerType().IsPossibleDynamicType(nullptr, false,
