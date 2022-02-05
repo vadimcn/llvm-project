@@ -6,7 +6,7 @@ from pathlib import Path
 from glob import glob
 import subprocess
 from subprocess import check_call
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from .python import build_lldb_python
 from .lldb import package_lldb
 from .utils import out_of_date
@@ -19,7 +19,7 @@ def dict_to_cmake(cmake_args: Dict[str, str]):
     return [f'-D{key}={val}' for key, val in cmake_args.items()]
 
 
-def build_libxml2(work_dir: Path, cfg: TargetConfig):
+def build_libxml2(work_dir: Path, cfg: TargetConfig, build_type: str):
     libxml2_src = work_dir / 'libxml2'
     if not libxml2_src.exists():
         check_call(['git', 'clone', '--branch=master', '--depth=1',
@@ -28,11 +28,15 @@ def build_libxml2(work_dir: Path, cfg: TargetConfig):
     libxml2_build = libxml2_src / 'build'
     libxml2_build.mkdir(exist_ok=True)
     libxml2_install = libxml2_src / 'install'
-    libname = 'libxml2sd.lib' if cfg['CMAKE_SYSTEM_NAME'] == 'Windows' else 'libxml2.a'
+    if cfg['CMAKE_SYSTEM_NAME'] != 'Windows':
+        libname = 'libxml2.a'
+    else:
+        libname = 'libxml2sd.lib' if build_type == 'Debug' else 'libxml2s.lib'
     libxml2_lib = libxml2_install / 'lib' / libname
 
     if out_of_date([libxml2_lib], [libxml2_src / '*.c', libxml2_src / '*.h']):
         cmake_args = {
+            'CMAKE_BUILD_TYPE': build_type,
             'CMAKE_INSTALL_PREFIX': str(libxml2_install),
             'BUILD_SHARED_LIBS': 'OFF',
             'LIBXML2_WITH_SAX1': 'ON',
@@ -102,7 +106,7 @@ def build_swig(work_dir: Path, cfg: TargetConfig):
 
 
 def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
-               ccache: Path,
+               ccache: Optional[Path],
                libxml_inc: Path, libxml_lib: Path, swig_exe: Path, swig_dir: Path,
                python_exe: Path, python_inc: Path, python_lib: Path) -> Path:
     llvm_src = Path(__file__).resolve().parent.parent / 'llvm'
@@ -111,7 +115,8 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
 
     cmake_args = {
         'CMAKE_BUILD_TYPE': build_type,
-        'LLVM_ENABLE_PROJECTS': 'clang;libcxx;lldb',
+        'LLVM_ENABLE_PROJECTS': 'clang;lldb',
+        'LLVM_ENABLE_RUNTIMES': 'libcxx',
         'LLVM_TARGETS_TO_BUILD': 'AArch64;ARM;AVR;MSP430;RISCV;X86;WebAssembly',
         'LLVM_PARALLEL_LINK_JOBS': '1',
         'LLVM_VERSION_SUFFIX': '-custom',
@@ -207,7 +212,7 @@ def main(args: Any):
     python_exe = Path(sys.executable)
     python_inc, python_lib = build_lldb_python(python_dist, python_lldb, cfg)
 
-    libxml_inc, libxml_lib = build_libxml2(work_dir, cfg)
+    libxml_inc, libxml_lib = build_libxml2(work_dir, cfg, args.build_type)
 
     swig_exe, swig_dir = build_swig(work_dir, cfg)
 
@@ -218,7 +223,7 @@ def main(args: Any):
                            python_exe=python_exe, python_inc=python_inc, python_lib=python_lib)
 
     lldb_archive = work_dir / f'lldb--{args.target}.zip'
-    lldb_debug_archive = work_dir / f'lldb-debug{args.target}.zip'
+    lldb_debug_archive = work_dir / f'lldb-debug--{args.target}.zip'
 
     package_lldb(lldb_root, python_lldb, cfg, lldb_archive, lldb_debug_archive, release_package=args.release_package)
 
