@@ -54,6 +54,17 @@ darwin: TargetConfig = {
     'CMAKE_STRIP': 'strip',
 }
 
+windows: TargetConfig = {
+    'CMAKE_HOST_SYSTEM_NAME': 'Windows',
+    'CMAKE_HOST_SYSTEM_PROCESSOR': 'x86_64',
+    'CMAKE_SYSTEM_NAME': 'Windows',
+    'CMAKE_SYSTEM_PROCESSOR': 'x86_64',
+    'CMAKE_C_COMPILER': 'cl',
+    'CMAKE_CXX_COMPILER': 'cl',
+    'CMAKE_CXX_FLAGS': '',
+    'CMAKE_C_FLAGS': '',
+    'CMAKE_STRIP': '',
+}
 
 targets: Dict[str, TargetConfig] = {
     'x86_64-linux-gnu': update_cfg(linux, {
@@ -89,17 +100,7 @@ targets: Dict[str, TargetConfig] = {
         'LLVM_HOST_TRIPLE': 'arm64-apple-darwin',
         'LLVM_TARGET_ARCH': 'arm64',
     }),
-    'x86_64-windows-msvc': {
-        'CMAKE_HOST_SYSTEM_NAME': 'Windows',
-        'CMAKE_HOST_SYSTEM_PROCESSOR': 'x86_64',
-        'CMAKE_SYSTEM_NAME': 'Windows',
-        'CMAKE_SYSTEM_PROCESSOR': 'x86_64',
-        'CMAKE_C_COMPILER': 'cl',
-        'CMAKE_CXX_COMPILER': 'cl',
-        'CMAKE_CXX_FLAGS': '',
-        'CMAKE_C_FLAGS': '',
-        'CMAKE_STRIP': '',
-    }
+    'x86_64-windows-msvc': update_cfg(windows, {})
 }
 
 

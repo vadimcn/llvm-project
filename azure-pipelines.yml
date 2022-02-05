@@ -2,6 +2,7 @@ variables:
   cachePrefix: 'B'
   buildTools: $(Agent.BuildDirectory)/build-tools
   llvmProject: $(Build.SourcesDirectory)/llvm-project
+  buildType: MinSizeRel
   SCCACHE: sccache
   SCCACHE_DIR: $(Agent.BuildDirectory)/sccache
   SCCACHE_IDLE_TIMEOUT: 60
@@ -56,9 +57,9 @@ jobs:
 
   - task: Cache@2
     inputs:
-      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType) | $(Build.BuildId)
       restoreKeys: |
-        $(cachePrefix) | $(Agent.OS) | $(Triple)
+        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType)
       path: $(SCCACHE_DIR)
       continueOnError: true
     displayName: SCCache
@@ -66,7 +67,8 @@ jobs:
 
   - script: |
       git -C $(llvmProject) remote set-url origin local
-      python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
+      python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) \
+        --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -134,9 +136,9 @@ jobs:
 
   - task: Cache@2
     inputs:
-      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType) | $(Build.BuildId)
       restoreKeys: |
-        $(cachePrefix) | $(Agent.OS) | $(Triple)
+        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType)
       path: $(SCCACHE_DIR)
       continueOnError: true
     displayName: SCCache
@@ -157,7 +159,8 @@ jobs:
   - script: |
       git -C $(llvmProject) remote set-url origin local
       export MACOSX_DEPLOYMENT_TARGET=$(DeploymentTarget)
-      xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
+      xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) \
+        --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -229,18 +232,20 @@ jobs:
 
   - task: Cache@2
     inputs:
-      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(Build.BuildId)
+      key: $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType) | $(Build.BuildId)
       restoreKeys: |
-        $(cachePrefix) | $(Agent.OS) | $(Triple)
+        $(cachePrefix) | $(Agent.OS) | $(Triple) | $(buildType)
       path: $(SCCACHE_DIR)
       continueOnError: true
     displayName: SCCache
     condition: always()
 
   - script: |
+      mkdir -p $(Agent.BuildDirectory)/llvm/bin
+      copy $(VCToolsRedistDir)\x64\Microsoft.VC143.CRT\vcruntime140_1.dll $(Agent.BuildDirectory)/llvm/bin
       git -C $(llvmProject) remote set-url origin local
       $(USEPYTHONVERSION_PYTHONLOCATION)\python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) ^
-          --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --release-package
+          --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package 
     displayName: 'Build'
 
   - task: CopyFiles@2
