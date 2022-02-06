@@ -112,6 +112,7 @@ def package_lldb(lldb_root: Path, python_dist: Path, cfg: TargetConfig,
                 'bin/lldb.exe',
                 'bin/lldb-argdumper.exe',
                 'bin/liblldb.dll',
+                'bin/vcruntime*.dll',
                 'lib/liblldb.lib',
             ]
             add_to_zip(rel_glob(lldb_root, lldb_files), zip)
