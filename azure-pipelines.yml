@@ -241,8 +241,8 @@ jobs:
     condition: always()
 
   - script: |
-      mkdir -p $(Agent.BuildDirectory)/llvm/bin
-      copy $(VCToolsRedistDir)\x64\Microsoft.VC143.CRT\vcruntime140_1.dll $(Agent.BuildDirectory)/llvm/bin
+      mkdir -p $(Agent.BuildDirectory)\llvm\bin
+      copy "$(VCToolsRedistDir)\x64\Microsoft.VC142.CRT\vcruntime140_1.dll" "$(Agent.BuildDirectory)\llvm\bin"
       git -C $(llvmProject) remote set-url origin local
       $(USEPYTHONVERSION_PYTHONLOCATION)\python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) ^
           --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package 
@@ -262,6 +262,7 @@ jobs:
       cd $(Agent.BuildDirectory)
       set > env.log
       tree /a > build-tree.log
+      dir $(Agent.BuildDirectory)\llvm\bin $(Agent.BuildDirectory)\llvm\lib > build-bin.log
       zip --recurse-patterns $(Agent.BuildDirectory)\$(Triple).zip "*.log" "CMakeCache.txt"
       echo ##vso[artifact.upload artifactname=logs]$(Agent.BuildDirectory)\$(Triple).zip
     displayName: 'Logs'
