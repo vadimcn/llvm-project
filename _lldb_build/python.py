@@ -38,8 +38,8 @@ def build_lldb_python(python_dist: Path, output: Path, cfg: TargetConfig):
     stdlib_src = python_dist / stdlib_src
     stdlib_dist = output / 'lib' if target_os == 'Windows' else output / 'lib' / f'python{major}.{minor}'
 
-    stdlib_files = rel_glob(stdlib_src, ['**/*.py', '**/*.pth', '**/*.pem'])
-    stdlib_exclude = ['config-*', 'idlelib/*', 'lib2to3/*', 'test/*',
+    stdlib_files = rel_glob(stdlib_src, ['**/*.py', '**/*.pth', '**/*.pem', '**/*.exe'])
+    stdlib_exclude = ['config-*', 'idlelib/*', 'lib2to3/*', 'test/*', 'venv/*',
                       'turtledemo/*', 'tkinter/*', 'curses/*', 'sqlite3/*']
     compose(stdlib_files, (exclude, stdlib_exclude), (copy_to, stdlib_dist))
 
