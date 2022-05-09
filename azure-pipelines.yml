@@ -68,7 +68,12 @@ jobs:
   - script: |
       git -C $(llvmProject) remote set-url origin local
       python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) \
-        --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package
+        --sysroot=/stretch \
+        --python-standalone=$(buildTools)/python \
+        --ccache=$(SCCACHE) \
+        --target=$(Triple) \
+        --build-type=$(buildType) \
+        --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -159,8 +164,13 @@ jobs:
   - script: |
       git -C $(llvmProject) remote set-url origin local
       export MACOSX_DEPLOYMENT_TARGET=$(DeploymentTarget)
-      xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) \
-        --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package
+      xcrun -sdk macosx python3 $(llvmProject)/lldb_build.py \
+        --build-dir=$(Agent.BuildDirectory) \
+        --python-standalone=$(buildTools)/python \
+        --ccache=$(SCCACHE) \
+        --target=$(Triple) \
+        --build-type=$(buildType) \
+        --release-package
     displayName: 'Build'
 
   - task: CopyFiles@2
@@ -244,8 +254,13 @@ jobs:
       mkdir -p $(Agent.BuildDirectory)\llvm\bin
       copy "$(VCToolsRedistDir)\x64\Microsoft.VC142.CRT\vcruntime140_1.dll" "$(Agent.BuildDirectory)\llvm\bin"
       git -C $(llvmProject) remote set-url origin local
-      $(USEPYTHONVERSION_PYTHONLOCATION)\python3 $(llvmProject)/lldb_build.py --build-dir=$(Agent.BuildDirectory) ^
-          --python-standalone=$(buildTools)/python --ccache=$(SCCACHE) --target=$(Triple) --build-type=$(buildType) --release-package 
+      $(USEPYTHONVERSION_PYTHONLOCATION)\python3 $(llvmProject)/lldb_build.py ^
+        --build-dir=$(Agent.BuildDirectory) ^
+        --python-standalone=$(buildTools)/python ^
+        --ccache=$(SCCACHE) ^
+        --target=$(Triple) ^
+        --build-type=$(buildType) ^
+        --release-package 
     displayName: 'Build'
 
   - task: CopyFiles@2

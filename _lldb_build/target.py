@@ -19,6 +19,7 @@ class TargetConfig(RequiredTargetConfig, total=False):
     CMAKE_OSX_ARCHITECTURES: str
     CMAKE_EXE_LINKER_FLAGS: str
     CMAKE_SHARED_LINKER_FLAGS: str
+    CMAKE_SYSROOT: str
 
 
 def update_cfg(original: TargetConfig, updates: Dict[str, str]) -> TargetConfig:

@@ -7,6 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--arch')
 parser.add_argument('--build-dir', type=Path)
 parser.add_argument('--build-tools', type=Path)
+parser.add_argument('--image', default='vadimcn/linux-builder:latest')
 args = parser.parse_args()
 
 project_root = Path(__file__).resolve().parent
@@ -30,8 +31,7 @@ check_call(['docker', 'run', '-it',  '--privileged',
             '-e' 'SCCACHE_IDLE_TIMEOUT=60',
             '-w' '/workspace/build',
             '-u' '1000:1000',
-            '-v' '/etc/passwd:/etc/passwd',
             '--memory=16G',
             '--cpus=10',
-            'vadimcn/linux-builder:latest',
+            args.image, 
             'bash', '-c', 'export PATH=/workspace/build-tools/bin:$PATH; bash'])
