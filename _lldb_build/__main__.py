@@ -90,24 +90,9 @@ def build_libxml2(work_dir: Path, cfg: TargetConfig, build_type: str):
     return (libxml2_install / 'include/libxml2'), libxml2_lib
 
 
-def build_swig(work_dir: Path, cfg: TargetConfig):
-    swig_src = work_dir / 'swig'
-    exename = 'swig' if 'win32' not in sys.platform else 'swig.exe'
-    swig_exe = swig_src / exename
-    if not swig_src.exists():
-        check_call(['git', 'clone', '--branch=py3-stable-abi', '--depth=1',
-                    'https://github.com/vadimcn/swig.git', str(swig_src)])
-    if out_of_date([swig_exe], [swig_src / '*.c', swig_src / '*.h']):
-        shell = cfg['CMAKE_SYSTEM_NAME'] == 'Windows'
-        check_call(['bash', './autogen.sh'], shell=shell, cwd=str(swig_src))
-        check_call(['bash', './configure', '--prefix=' + str(swig_src)], shell=shell, cwd=str(swig_src))
-        check_call(['make'], cwd=str(swig_src))
-    return swig_exe, swig_src
-
-
 def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
                ccache: Optional[Path],
-               libxml_inc: Path, libxml_lib: Path, swig_exe: Path, swig_dir: Path,
+               libxml_inc: Path, libxml_lib: Path,
                python_exe: Path, python_inc: Path, python_lib: Path) -> Path:
     llvm_src = Path(__file__).resolve().parent.parent / 'llvm'
     llvm_build = work_dir / 'llvm'
@@ -135,8 +120,6 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
         'Python3_EXECUTABLE': str(python_exe),
         'Python3_INCLUDE_DIRS': str(python_inc),
         'Python3_LIBRARIES': str(python_lib),
-        'SWIG_EXECUTABLE': str(swig_exe),
-        'SWIG_DIR': str(swig_dir),
         'LIBXML2_INCLUDE_DIR': str(libxml_inc),
         'LIBXML2_LIBRARY': str(libxml_lib),
     }
@@ -180,7 +163,6 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
     for a in cmake_args:
         print(' ', a)
 
-    os.environ['SWIG_LIB'] = str(swig_dir / 'Lib')
     os.environ['PATH'] = str(python_exe.parent) + os.pathsep + os.environ['PATH']
 
     check_call(['cmake', '-GNinja', str(llvm_src), '-B', str(llvm_build)] + cmake_args)
@@ -195,6 +177,8 @@ def build_lldb(work_dir: Path, cfg: TargetConfig, build_type: str, *,
 def main(args: Any):
     work_dir = args.build_dir.resolve()
     cfg = get_target_config(args.target)
+    if args.sysroot:
+        cfg['CMAKE_SYSROOT'] = str(args.sysroot)
 
     target_python_archive = cfg.get('TARGET_PYTHON_ARCHIVE')
     if target_python_archive is None:
@@ -214,12 +198,9 @@ def main(args: Any):
 
     libxml_inc, libxml_lib = build_libxml2(work_dir, cfg, args.build_type)
 
-    swig_exe, swig_dir = build_swig(work_dir, cfg)
-
     lldb_root = build_lldb(work_dir, cfg, args.build_type,
                            ccache=args.ccache,
                            libxml_inc=libxml_inc, libxml_lib=libxml_lib,
-                           swig_exe=swig_exe, swig_dir=swig_dir,
                            python_exe=python_exe, python_inc=python_inc, python_lib=python_lib)
 
     lldb_archive = work_dir / f'lldb--{args.target}.zip'
@@ -235,6 +216,7 @@ if __name__ == '__main__':
     parser.add_argument('--build-dir', type=Path, default='.')
     parser.add_argument('--build-type', default='MinSizeRel')
     parser.add_argument('--release-package', action='store_true')
+    parser.add_argument('--sysroot', type=Path)
     parser.add_argument('--ccache', type=Path)
     args = parser.parse_args()
     main(args)
