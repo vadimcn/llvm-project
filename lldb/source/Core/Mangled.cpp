@@ -50,8 +50,12 @@ Mangled::ManglingScheme Mangled::GetManglingScheme(llvm::StringRef const name) {
   if (name.startswith("_D"))
     return Mangled::eManglingSchemeD;
 
-  if (name.startswith("_Z"))
-    return Mangled::eManglingSchemeItanium;
+  if (name.startswith("_Z")) {
+    if (llvm::isRustLegacyMangling(name.data(), name.size())) 
+      return Mangled::eManglingSchemeRustLegacy;
+    else
+      return Mangled::eManglingSchemeItanium;
+  }
 
   // ___Z is a clang extension of block invocations
   if (name.startswith("___Z"))
@@ -167,6 +171,19 @@ static char *GetItaniumDemangledStr(const char *M) {
   return demangled_cstr;
 }
 
+static char *GetRustLegacyDemangledStr(const char *M) {
+  char *demangled_cstr = llvm::rustLegacyDemangle(M, nullptr, nullptr, nullptr);
+
+  if (Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_DEMANGLE)) {
+    if (demangled_cstr && demangled_cstr[0])
+      LLDB_LOG(log, "demangled rustlegacy: {0} -> \"{1}\"", M, demangled_cstr);
+    else
+      LLDB_LOG(log, "demangled rustlegacy: {0} -> error: failed to demangle", M);
+  }
+
+  return demangled_cstr;
+}
+
 static char *GetRustV0DemangledStr(const char *M) {
   char *demangled_cstr = llvm::rustDemangle(M, nullptr, nullptr, nullptr);
 
@@ -242,6 +259,7 @@ bool Mangled::GetRichManglingInfo(RichManglingContext &context,
     }
   }
 
+  case eManglingSchemeRustLegacy:
   case eManglingSchemeRustV0:
   case eManglingSchemeD:
     // Rich demangling scheme is not supported
@@ -271,10 +289,12 @@ ConstString Mangled::GetDemangledName() const {
       case eManglingSchemeMSVC:
         demangled_name = GetMSVCDemangledStr(mangled_name);
         break;
-      case eManglingSchemeItanium: {
+      case eManglingSchemeItanium: 
         demangled_name = GetItaniumDemangledStr(mangled_name);
         break;
-      }
+      case eManglingSchemeRustLegacy:
+        demangled_name = GetRustLegacyDemangledStr(mangled_name);
+        break;
       case eManglingSchemeRustV0:
         demangled_name = GetRustV0DemangledStr(mangled_name);
         break;

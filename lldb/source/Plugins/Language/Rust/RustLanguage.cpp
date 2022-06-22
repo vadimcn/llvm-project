@@ -53,3 +53,13 @@ Language *RustLanguage::CreateInstance(lldb::LanguageType language) {
 bool RustLanguage::IsSourceFile(llvm::StringRef file_path) const {
   return file_path.endswith(".rs");
 }
+
+bool RustLanguage::SymbolNameFitsToLanguage(Mangled name) const {
+  const char *mangled_name = name.GetMangledName().GetCString();
+  if (!mangled_name)
+    return false;
+
+  Mangled::ManglingScheme scheme = Mangled::GetManglingScheme(mangled_name);
+  return scheme == Mangled::ManglingScheme::eManglingSchemeRustLegacy ||
+         scheme == Mangled::ManglingScheme::eManglingSchemeRustV0;
+}
