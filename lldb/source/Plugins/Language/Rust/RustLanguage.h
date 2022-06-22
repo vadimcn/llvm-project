@@ -38,9 +38,11 @@ public:
 
   static llvm::StringRef GetPluginNameStatic();
 
+  llvm::StringRef GetPluginName() override;
+
   bool IsSourceFile(llvm::StringRef file_path) const override;
 
-  llvm::StringRef GetPluginName() override;
+  bool SymbolNameFitsToLanguage(Mangled name) const override;
 };
 
 } // namespace lldb_private
