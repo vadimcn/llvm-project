@@ -1047,7 +1047,10 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(
                                decl_column, call_file, call_line, call_column,
                                &frame_base)) {
     Mangled func_name;
-    func_name.SetValue(ConstString(name), false);
+    if (mangled)
+      func_name.SetValue(ConstString(mangled), true);
+    else
+      func_name.SetValue(ConstString(name), false);
 
     FunctionSP func_sp;
     std::unique_ptr<Declaration> decl_ap;

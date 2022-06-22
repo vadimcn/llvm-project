@@ -43,6 +43,7 @@ public:
     eManglingSchemeNone = 0,
     eManglingSchemeMSVC,
     eManglingSchemeItanium,
+    eManglingSchemeRustLegacy,
     eManglingSchemeRustV0,
     eManglingSchemeD
   };
