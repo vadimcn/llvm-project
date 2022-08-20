@@ -31,6 +31,7 @@
 
 using namespace lldb;
 using namespace lldb_private;
+using namespace lldb_private::dwarf;
 
 #define INVALID_ATTR dw_attr_t(-1)
 
@@ -1039,7 +1040,7 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(
   int call_file = 0;
   int call_line = 0;
   int call_column = 0;
-  DWARFExpression frame_base;
+  DWARFExpressionList frame_base;
 
   assert(die.Tag() == DW_TAG_subprogram);
 

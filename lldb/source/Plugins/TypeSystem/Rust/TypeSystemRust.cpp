@@ -2046,8 +2046,7 @@ CompilerDeclContext TypeSystemRust::DeclGetDeclContext(void *opaque_decl) {
 }
 
 CompilerType TypeSystemRust::GetTypeForDecl(void *opaque_decl) {
-  Host::SystemLog(Host::eSystemLogError,
-                  "error: need to implement TypeSystemRust::GetTypeForDecl\n");
+  Host::SystemLog("error: need to implement TypeSystemRust::GetTypeForDecl\n");
   // RustDecl *dc = (RustDecl *) opaque_decl;
   return CompilerType();
 }
