@@ -174,7 +174,7 @@ static char *GetItaniumDemangledStr(const char *M) {
 static char *GetRustLegacyDemangledStr(const char *M) {
   char *demangled_cstr = llvm::rustLegacyDemangle(M, nullptr, nullptr, nullptr);
 
-  if (Log *log = lldb_private::GetLogIfAllCategoriesSet(LIBLLDB_LOG_DEMANGLE)) {
+  if (Log *log = GetLog(LLDBLog::Demangle)) {
     if (demangled_cstr && demangled_cstr[0])
       LLDB_LOG(log, "demangled rustlegacy: {0} -> \"{1}\"", M, demangled_cstr);
     else

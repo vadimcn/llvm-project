@@ -2046,8 +2046,7 @@ CompilerDeclContext TypeSystemRust::DeclGetDeclContext(void *opaque_decl) {
 }
 
 CompilerType TypeSystemRust::GetTypeForDecl(void *opaque_decl) {
-  Host::SystemLog(Host::eSystemLogError,
-                  "error: need to implement TypeSystemRust::GetTypeForDecl\n");
+  Host::SystemLog("error: need to implement TypeSystemRust::GetTypeForDecl\n");
   // RustDecl *dc = (RustDecl *) opaque_decl;
   return CompilerType();
 }
@@ -2172,7 +2171,7 @@ bool TypeSystemRust::GetCABITypeDeclaration(
 
 CompilerType
 TypeSystemRust::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
-                                        size_t idx) {
+                                        size_t idx, bool expand_pack) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {
@@ -2185,7 +2184,8 @@ TypeSystemRust::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
 }
 
 size_t
-TypeSystemRust::GetNumTemplateArguments(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetNumTemplateArguments(lldb::opaque_compiler_type_t type,
+                                        bool expand_pack) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {

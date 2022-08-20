@@ -351,15 +351,17 @@ public:
                                 std::vector<uint32_t> &child_indexes) override;
 
   lldb::TemplateArgumentKind
-  GetTemplateArgumentKind(lldb::opaque_compiler_type_t type,
-                          size_t idx) override {
+  GetTemplateArgumentKind(lldb::opaque_compiler_type_t type, size_t idx,
+                          bool expand_pack) override {
     // Rust currently only has types.
     return lldb::eTemplateArgumentKindType;
   }
 
   CompilerType GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
-                                       size_t idx) override;
-  size_t GetNumTemplateArguments(lldb::opaque_compiler_type_t type) override;
+                                       size_t idx, bool expand_pack) override;
+
+  size_t GetNumTemplateArguments(lldb::opaque_compiler_type_t type,
+                                 bool expand_pack) override;
 
   //----------------------------------------------------------------------
   // Dumping types
