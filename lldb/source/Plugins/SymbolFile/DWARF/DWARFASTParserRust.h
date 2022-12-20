@@ -25,8 +25,8 @@
 #include "DWARFDebugInfoEntry.h"
 #include "DWARFDefines.h"
 #include "DWARFFormValue.h"
-#include "lldb/Core/PluginInterface.h"
 #include "Plugins/TypeSystem/Rust/TypeSystemRust.h"
+#include "lldb/Core/PluginInterface.h"
 
 class DWARFDebugInfoEntry;
 class DWARFDIECollection;
@@ -34,6 +34,9 @@ class DWARFDIECollection;
 class DWARFASTParserRust : public DWARFASTParser {
 public:
   DWARFASTParserRust(lldb_private::TypeSystemRust &ast) : m_ast(ast) {}
+
+  lldb_private::ConstString
+  ConstructDemangledNameFromDWARF(const DWARFDIE &die) override;
 
   lldb::TypeSP ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
                                   const DWARFDIE &die,
@@ -52,6 +55,9 @@ public:
 
   lldb_private::CompilerDeclContext
   GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) override;
+
+  lldb_private::ConstString
+  GetDIEClassTemplateParams(const DWARFDIE &die) override;
 
   lldb_private::CompilerDecl
   GetDeclForUIDFromDWARF(const DWARFDIE &die) override;

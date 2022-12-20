@@ -187,7 +187,7 @@ public:
   lldb::TypeClass TypeClass() const override { return eTypeClassEnumeration; }
 
   uint64_t ByteSize() const override {
-    return m_underlying_type.GetByteSize(nullptr).getValueOr(0);
+    return m_underlying_type.GetByteSize(nullptr).value_or(0);
   }
 
   bool IsSigned() const {
@@ -309,7 +309,7 @@ public:
   lldb::TypeClass TypeClass() const override { return eTypeClassArray; }
 
   uint64_t ByteSize() const override {
-    return m_elem.GetByteSize(nullptr).getValueOr(0) * m_length;
+    return m_elem.GetByteSize(nullptr).value_or(0) * m_length;
   }
 
   std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
@@ -712,7 +712,7 @@ public:
   lldb::TypeClass TypeClass() const override { return eTypeClassTypedef; }
 
   uint64_t ByteSize() const override {
-    return m_type.GetByteSize(nullptr).getValueOr(0);
+    return m_type.GetByteSize(nullptr).value_or(0);
   }
 
   std::string GetCABITypeDeclaration(TypeSystemRust::TypeNameMap *name_map,
@@ -1116,7 +1116,8 @@ uint32_t TypeSystemRust::GetPointerByteSize() { return m_pointer_byte_size; }
 // Accessors
 //----------------------------------------------------------------------
 
-ConstString TypeSystemRust::GetTypeName(lldb::opaque_compiler_type_t type) {
+ConstString TypeSystemRust::GetTypeName(lldb::opaque_compiler_type_t type,
+                                        bool BaseOnly) {
   if (type)
     return static_cast<RustType *>(type)->Name();
   return ConstString();
@@ -1124,7 +1125,7 @@ ConstString TypeSystemRust::GetTypeName(lldb::opaque_compiler_type_t type) {
 
 ConstString
 TypeSystemRust::GetDisplayTypeName(lldb::opaque_compiler_type_t type) {
-  return GetTypeName(type);
+  return GetTypeName(type, false);
 }
 
 uint32_t
@@ -1206,7 +1207,7 @@ TypeSystemRust::GetArrayElementType(lldb::opaque_compiler_type_t type,
 CompilerType TypeSystemRust::GetArrayType(lldb::opaque_compiler_type_t type,
                                           uint64_t size) {
   if (type) {
-    return CreateArrayType(CompilerType(this, type), size);
+    return CreateArrayType(CompilerType(weak_from_this(), type), size);
   }
   return CompilerType();
 }
@@ -1216,12 +1217,12 @@ TypeSystemRust::GetCanonicalType(lldb::opaque_compiler_type_t type) {
   RustTypedef *t = static_cast<RustType *>(type)->AsTypedef();
   if (t)
     return t->UnderlyingType();
-  return CompilerType(this, type);
+  return CompilerType(weak_from_this(), type);
 }
 
 CompilerType
 TypeSystemRust::GetFullyUnqualifiedType(lldb::opaque_compiler_type_t type) {
-  return CompilerType(this, type);
+  return CompilerType(weak_from_this(), type);
 }
 
 // Returns -1 if this isn't a function or if the function doesn't have a
@@ -1261,7 +1262,7 @@ TypeSystemRust::GetMemberFunctionAtIndex(lldb::opaque_compiler_type_t type,
 
 CompilerType
 TypeSystemRust::GetNonReferenceType(lldb::opaque_compiler_type_t type) {
-  return CompilerType(this, type);
+  return CompilerType(weak_from_this(), type);
 }
 
 CompilerType
@@ -1285,10 +1286,10 @@ CompilerType TypeSystemRust::GetPointeeType(lldb::opaque_compiler_type_t type) {
 }
 
 CompilerType TypeSystemRust::GetPointerType(lldb::opaque_compiler_type_t type) {
-  ConstString type_name = GetTypeName(type);
+  ConstString type_name = GetTypeName(type, false);
   // Arbitrarily look for a raw pointer here.
   ConstString pointer_name(std::string("*mut ") + type_name.GetCString());
-  return CreatePointerType(pointer_name, CompilerType(this, type),
+  return CreatePointerType(pointer_name, CompilerType(weak_from_this(), type),
                            m_pointer_byte_size);
 }
 
@@ -1336,7 +1337,7 @@ TypeSystemRust::GetFloatTypeSemantics(size_t byte_size) {
   }
 }
 
-llvm::Optional<uint64_t>
+std::optional<uint64_t>
 TypeSystemRust::GetBitSize(lldb::opaque_compiler_type_t type,
                            ExecutionContextScope *exe_scope) {
   if (!type)
@@ -1372,7 +1373,7 @@ lldb::Format TypeSystemRust::GetFormat(lldb::opaque_compiler_type_t type) {
   return static_cast<RustType *>(type)->Format();
 }
 
-llvm::Optional<size_t>
+std::optional<size_t>
 TypeSystemRust::GetTypeBitAlign(lldb::opaque_compiler_type_t type,
                                 ExecutionContextScope *exe_scope) {
   return {};
@@ -1473,7 +1474,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
     uint64_t bit_offset;
     CompilerType ret =
         GetFieldAtIndex(type, idx, child_name, &bit_offset, nullptr, nullptr);
-    llvm::Optional<uint64_t> size = ret.GetByteSize(
+    std::optional<uint64_t> size = ret.GetByteSize(
         exe_ctx ? exe_ctx->GetBestExecutionContextScope() : nullptr);
     if (!size)
       return {};
@@ -1502,7 +1503,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
 
       // We have a pointer to an simple type
       if (idx == 0 && pointee.GetCompleteType()) {
-        llvm::Optional<uint64_t> size = pointee.GetByteSize(
+        std::optional<uint64_t> size = pointee.GetByteSize(
             exe_ctx ? exe_ctx->GetBestExecutionContextScope() : NULL);
         if (!size)
           return {};
@@ -1518,7 +1519,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
         char element_name[64];
         ::snprintf(element_name, sizeof(element_name), "[%zu]", idx);
         child_name.assign(element_name);
-        llvm::Optional<uint64_t> size = element_type.GetByteSize(
+        std::optional<uint64_t> size = element_type.GetByteSize(
             exe_ctx ? exe_ctx->GetBestExecutionContextScope() : NULL);
         if (!size)
           return {};
@@ -1608,7 +1609,7 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
       CompilerType typedef_compiler_type = typ->UnderlyingType();
       if (format == eFormatDefault)
         format = typedef_compiler_type.GetFormat();
-      llvm::Optional<uint64_t> typedef_byte_size =
+      std::optional<uint64_t> typedef_byte_size =
           typedef_compiler_type.GetByteSize(exe_scope);
       if (!typedef_byte_size)
         return false;
@@ -1763,7 +1764,7 @@ void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
                                          lldb::DescriptionLevel level) {
   if (!type)
     return;
-  ConstString name = GetTypeName(type);
+  ConstString name = GetTypeName(type, false);
   RustType *t = static_cast<RustType *>(type);
 
   if (RustAggregateBase *agg = t->AsAggregate()) {
@@ -1806,7 +1807,7 @@ void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
 
 CompilerType TypeSystemRust::CacheType(RustType *new_type) {
   m_types.insert(std::unique_ptr<RustType>(new_type));
-  return CompilerType(this, new_type);
+  return CompilerType(weak_from_this(), new_type);
 }
 
 CompilerType
@@ -1900,8 +1901,7 @@ void TypeSystemRust::AddFieldToStruct(const CompilerType &struct_type,
                                       uint64_t discriminant) {
   if (!struct_type)
     return;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(struct_type.GetTypeSystem());
+  auto ast = struct_type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return;
   RustType *type = static_cast<RustType *>(struct_type.GetOpaqueQualType());
@@ -1948,8 +1948,7 @@ TypeSystemRust::CreateCLikeEnumType(const lldb_private::ConstString &name,
 bool TypeSystemRust::IsTupleType(const CompilerType &type) {
   if (!type)
     return false;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1959,8 +1958,7 @@ bool TypeSystemRust::IsTupleType(const CompilerType &type) {
 bool TypeSystemRust::TypeHasDiscriminant(const CompilerType &type) {
   if (!type)
     return false;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1974,8 +1972,7 @@ bool TypeSystemRust::GetEnumDiscriminantLocation(const CompilerType &type,
                                                  uint64_t &discr_byte_size) {
   if (!type)
     return false;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -1990,8 +1987,7 @@ CompilerType TypeSystemRust::FindEnumVariant(const CompilerType &type,
                                              uint64_t discriminant) {
   if (!type)
     return CompilerType();
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return CompilerType();
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -2004,8 +2000,7 @@ CompilerType TypeSystemRust::FindEnumVariant(const CompilerType &type,
 void TypeSystemRust::FinishAggregateInitialization(const CompilerType &type) {
   if (!type)
     return;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -2160,8 +2155,7 @@ bool TypeSystemRust::GetCABITypeDeclaration(
     TypeSystemRust::TypeNameMap *name_map, std::string *result) {
   if (!type)
     return false;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return false;
   RustType *rtype = static_cast<RustType *>(type.GetOpaqueQualType());
@@ -2171,7 +2165,7 @@ bool TypeSystemRust::GetCABITypeDeclaration(
 
 CompilerType
 TypeSystemRust::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
-                                        size_t idx) {
+                                        size_t idx, bool expand_pack) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {
@@ -2184,7 +2178,8 @@ TypeSystemRust::GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
 }
 
 size_t
-TypeSystemRust::GetNumTemplateArguments(lldb::opaque_compiler_type_t type) {
+TypeSystemRust::GetNumTemplateArguments(lldb::opaque_compiler_type_t type,
+                                        bool expand_pack) {
   if (type) {
     RustType *t = static_cast<RustType *>(type);
     if (RustAggregateBase *a = t->AsAggregate()) {
@@ -2200,8 +2195,7 @@ void TypeSystemRust::AddTemplateParameter(const CompilerType &type,
                                           const CompilerType &param) {
   if (!type)
     return;
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast)
     return;
   RustType *t = static_cast<RustType *>(type.GetOpaqueQualType());

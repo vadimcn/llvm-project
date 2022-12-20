@@ -60,8 +60,8 @@ char *microsoftDemangle(const char *mangled_name, size_t *n_read, char *buf,
 // Checks whether this is a Rust legacy mangled symbol.
 bool isRustLegacyMangling(const char *MangledName, size_t Length);
 
-// Demangles a Rust legacy mangled symbol. The API follows that of __cxa_demangle.
-char *rustLegacyDemangle(const char *MangledName, char *Buf, size_t *N, int *Status);
+// Demangles a Rust legacy mangled symbol.
+char *rustLegacyDemangle(const char *MangledName);
 
 // Demangles a Rust v0 mangled symbol.
 char *rustDemangle(const char *MangledName);
