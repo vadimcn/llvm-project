@@ -225,7 +225,8 @@ public:
   // Accessors
   //----------------------------------------------------------------------
 
-  ConstString GetTypeName(lldb::opaque_compiler_type_t type) override;
+  ConstString GetTypeName(lldb::opaque_compiler_type_t type,
+                          bool BaseOnly) override;
 
   ConstString GetDisplayTypeName(lldb::opaque_compiler_type_t type) override;
 
@@ -277,9 +278,8 @@ public:
 
   const llvm::fltSemantics &GetFloatTypeSemantics(size_t byte_size) override;
 
-  llvm::Optional<uint64_t>
-  GetBitSize(lldb::opaque_compiler_type_t type,
-             ExecutionContextScope *exe_scope) override;
+  std::optional<uint64_t> GetBitSize(lldb::opaque_compiler_type_t type,
+                                     ExecutionContextScope *exe_scope) override;
 
   lldb::Encoding GetEncoding(lldb::opaque_compiler_type_t type,
                              uint64_t &count) override;
@@ -351,15 +351,17 @@ public:
                                 std::vector<uint32_t> &child_indexes) override;
 
   lldb::TemplateArgumentKind
-  GetTemplateArgumentKind(lldb::opaque_compiler_type_t type,
-                          size_t idx) override {
+  GetTemplateArgumentKind(lldb::opaque_compiler_type_t type, size_t idx,
+                          bool expand_pack) override {
     // Rust currently only has types.
     return lldb::eTemplateArgumentKindType;
   }
 
   CompilerType GetTypeTemplateArgument(lldb::opaque_compiler_type_t type,
-                                       size_t idx) override;
-  size_t GetNumTemplateArguments(lldb::opaque_compiler_type_t type) override;
+                                       size_t idx, bool expand_pack) override;
+
+  size_t GetNumTemplateArguments(lldb::opaque_compiler_type_t type,
+                                 bool expand_pack) override;
 
   //----------------------------------------------------------------------
   // Dumping types
@@ -407,7 +409,7 @@ public:
   bool IsCStringType(lldb::opaque_compiler_type_t type,
                      uint32_t &length) override;
 
-  virtual llvm::Optional<size_t>
+  virtual std::optional<size_t>
   GetTypeBitAlign(lldb::opaque_compiler_type_t type,
                   ExecutionContextScope *exe_scope) override;
 

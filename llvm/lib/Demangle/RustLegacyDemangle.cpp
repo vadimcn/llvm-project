@@ -75,28 +75,18 @@ bool llvm::isRustLegacyMangling(const char *MangledName, size_t Length) {
   return CompStart && isRustHash(CompStart, CompEnd);
 }
 
-char *llvm::rustLegacyDemangle(const char *MangledName, char *Buf, size_t *N,
-                               int *Status) {
+char *llvm::rustLegacyDemangle(const char *MangledName) {
 
-  if (MangledName == nullptr || (Buf != nullptr && N == nullptr)) {
-    if (Status != nullptr)
-      *Status = demangle_invalid_args;
+  if (MangledName == nullptr) {
     return nullptr;
   }
 
   size_t Length = std::strlen(MangledName);
   if (!startsWith("_ZN", MangledName, MangledName + Length)) {
-    if (Status != nullptr)
-      *Status = demangle_invalid_mangled_name;
     return nullptr;
   }
 
   OutputBuffer Demangled;
-  if (!initializeOutputBuffer(nullptr, nullptr, Demangled, 1024)) {
-    if (Status != nullptr)
-      *Status = demangle_memory_alloc_failure;
-    return nullptr;
-  }
 
   const char *M = MangledName + 3;
   const char *CompStart = nullptr;
@@ -176,24 +166,5 @@ char *llvm::rustLegacyDemangle(const char *MangledName, char *Buf, size_t *N,
   }
   Demangled << '\0';
 
-  char *DemangledBuf = Demangled.getBuffer();
-  size_t DemangledLen = Demangled.getCurrentPosition();
-
-  if (Buf != nullptr) {
-    if (DemangledLen <= *N) {
-      std::memcpy(Buf, DemangledBuf, DemangledLen);
-      std::free(DemangledBuf);
-      DemangledBuf = Buf;
-    } else {
-      std::free(Buf);
-    }
-  }
-
-  if (N != nullptr)
-    *N = DemangledLen;
-
-  if (Status != nullptr)
-    *Status = demangle_success;
-
-  return DemangledBuf;
+  return Demangled.getBuffer();
 }

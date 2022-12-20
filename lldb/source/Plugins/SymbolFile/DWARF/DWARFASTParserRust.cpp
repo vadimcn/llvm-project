@@ -28,6 +28,7 @@
 #include "lldb/Symbol/Function.h"
 #include "lldb/Symbol/ObjectFile.h"
 #include "lldb/Symbol/TypeList.h"
+#include "lldb/Utility/StreamString.h"
 
 using namespace lldb;
 using namespace lldb_private;
@@ -133,6 +134,14 @@ public:
 private:
   DWARFDIE m_die;
 };
+
+ConstString
+DWARFASTParserRust::ConstructDemangledNameFromDWARF(const DWARFDIE &die) {
+  StreamString sstr;
+  DWARFDeclContext decl_ctx = SymbolFileDWARF::GetDWARFDeclContext(die);
+  sstr << decl_ctx.GetQualifiedName();
+  return ConstString(sstr.GetString());
+}
 
 ConstString DWARFASTParserRust::FullyQualify(const ConstString &name,
                                              const DWARFDIE &die) {
@@ -241,9 +250,9 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log,
     assert(0);
   }
 
-  return TypeSP(new Type(die.GetID(), dwarf, type_name_const_str, byte_size,
-                         NULL, encoding_uid, encoding_data_type, Declaration(),
-                         compiler_type, resolve_state));
+  return dwarf->MakeType(die.GetID(), type_name_const_str, byte_size, NULL,
+                         encoding_uid, encoding_data_type, Declaration(),
+                         compiler_type, resolve_state);
 }
 
 TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
@@ -281,10 +290,11 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
   compiler_type = m_ast.CreateArrayType(array_element_type, count);
 
   ConstString type_name_const_str = compiler_type.GetTypeName();
-  TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str,
-                          element_type->GetByteSize(NULL).getValueOr(0), NULL,
-                          type_die_id, Type::eEncodingIsUID, Declaration(),
-                          compiler_type, Type::ResolveState::Full));
+  TypeSP type_sp =
+      dwarf->MakeType(die.GetID(), type_name_const_str,
+                      element_type->GetByteSize(NULL).value_or(0), NULL,
+                      type_die_id, Type::eEncodingIsUID, Declaration(),
+                      compiler_type, Type::ResolveState::Full);
   type_sp->SetEncodingType(element_type);
   return type_sp;
 }
@@ -353,9 +363,9 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
       type_name_const_str, return_type, std::move(function_param_types),
       std::move(template_params));
 
-  TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str, 0, NULL,
-                          LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-                          compiler_type, Type::ResolveState::Full));
+  TypeSP type_sp = dwarf->MakeType(
+      die.GetID(), type_name_const_str, 0, NULL, LLDB_INVALID_UID,
+      Type::eEncodingIsUID, &decl, compiler_type, Type::ResolveState::Full);
 
   return type_sp;
 }
@@ -588,7 +598,7 @@ std::vector<DWARFASTParserRust::Field> DWARFASTParserRust::ParseFields(
       if (type) {
         lldb_private::CompilerType ctype = type->GetFullCompilerType();
         discr_byte_size =
-            m_ast.GetBitSize(ctype.GetOpaqueQualType(), nullptr).getValue() / 8;
+            m_ast.GetBitSize(ctype.GetOpaqueQualType(), nullptr).value() / 8;
       }
     } else if (child_die.Tag() == DW_TAG_variant_part) {
       // New-style enum representation -- nothing useful is in the
@@ -745,7 +755,8 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
   bool compiler_type_was_created = false;
   CompilerType compiler_type(
-      &m_ast, dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
+      m_ast.weak_from_this(),
+      dwarf->m_forward_decl_die_to_clang_type.lookup(die.GetDIE()));
   if (!compiler_type) {
     compiler_type_was_created = true;
 
@@ -786,9 +797,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
                                              has_discriminant);
   }
 
-  type_sp.reset(new Type(die.GetID(), dwarf, type_name_const_str, byte_size,
-                         NULL, LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-                         compiler_type, Type::ResolveState::Forward));
+  type_sp = dwarf->MakeType(die.GetID(), type_name_const_str, byte_size, NULL,
+                            LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
+                            compiler_type, Type::ResolveState::Forward);
 
   // Now add the fields.
   int fieldno = 0;
@@ -914,9 +925,9 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
   Declaration decl;
   CompilerType compiler_type = m_ast.CreateCLikeEnumType(
       type_name_const_str, underlying_type, std::move(values));
-  TypeSP type_sp(new Type(die.GetID(), dwarf, type_name_const_str, 0, NULL,
-                          LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-                          compiler_type, Type::ResolveState::Full));
+  TypeSP type_sp = dwarf->MakeType(
+      die.GetID(), type_name_const_str, 0, NULL, LLDB_INVALID_UID,
+      Type::eEncodingIsUID, &decl, compiler_type, Type::ResolveState::Full);
 
   return type_sp;
 }
@@ -1136,6 +1147,11 @@ DWARFASTParserRust::GetDeclContextContainingUIDFromDWARF(const DWARFDIE &die) {
     decl_ctx_die = dwarf->GetDeclContextDIEContainingDIE(die);
   }
   return GetDeclContextForUIDFromDWARF(decl_ctx_die);
+}
+
+lldb_private::ConstString
+DWARFASTParserRust::GetDIEClassTemplateParams(const DWARFDIE &die) {
+  return ConstString();
 }
 
 lldb_private::CompilerDecl

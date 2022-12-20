@@ -37,7 +37,7 @@ static std::set<std::string> primitive_type_names{
 
 static TypeSystemRust *GetASTContext(CompilerType type, Status &error) {
   TypeSystemRust *result =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
+      type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>().get();
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
@@ -55,7 +55,7 @@ static TypeSystemRust *GetASTContext(ExecutionContext &ctxt, Status &error) {
     return nullptr;
   }
   TypeSystemRust *result =
-      llvm::dyn_cast_or_null<TypeSystemRust>(&sys_or_err.get());
+      llvm::dyn_cast_or_null<TypeSystemRust>(sys_or_err->get());
   if (!result) {
     error.SetErrorString("not a Rust type!?");
   }
@@ -86,7 +86,7 @@ static ValueObjectSP CreateValueInMemory(ExecutionContext &exe_ctx,
   }
 
   Process *proc = exe_ctx.GetProcessPtr();
-  uint64_t size = type.GetByteSize(proc).getValueOr(0);
+  uint64_t size = type.GetByteSize(proc).value_or(0);
   addr_t addr = proc->AllocateMemory(
       size, lldb::ePermissionsWritable | lldb::ePermissionsReadable, error);
   if (addr == LLDB_INVALID_ADDRESS) {
@@ -232,7 +232,7 @@ ValueObjectSP lldb_private::rust::UnarySizeof(ExecutionContext &exe_ctx,
     uint32_t ptr_size = ast->GetPointerByteSize();
     CompilerType type =
         ast->CreateIntegralType(ConstString("usize"), false, ptr_size);
-    Scalar size(val->GetByteSize().getValueOr(0));
+    Scalar size(val->GetByteSize().value_or(0));
     return CreateValueFromScalar(exe_ctx, size, type, error);
   }
   return ValueObjectSP();
@@ -506,7 +506,7 @@ bool RustPath::FindDecl(ExecutionContext &exe_ctx, Status &error,
     if (!ts_or_err) {
       return true;
     }
-    SymbolFile *symbol_file = ts_or_err->GetSymbolFile();
+    SymbolFile *symbol_file = ts_or_err.get()->GetSymbolFile();
     if (!symbol_file) {
       return true;
     }
@@ -1461,7 +1461,7 @@ RustExpressionUP Parser::Field(RustExpressionUP &&lhs, Status &error) {
     Advance();
   } else if (CurrentToken().kind == INTEGER) {
     result = std::make_unique<RustTupleFieldExpression>(
-        std::move(lhs), CurrentToken().uinteger.getValue());
+        std::move(lhs), CurrentToken().uinteger.value());
     Advance();
   } else {
     error.SetErrorString("identifier or integer expected");
@@ -1703,6 +1703,7 @@ RustExpressionUP Parser::Term(Status &error) {
 
   // Double-check StartsTerm.
   bool starts = StartsTerm();
+  (void)starts;
 
   switch (CurrentToken().kind) {
   case INTEGER: {
@@ -1712,7 +1713,7 @@ RustExpressionUP Parser::Term(Status &error) {
     }
     RustTypeExpressionUP type =
         std::make_unique<RustPathTypeExpression>(suffix);
-    term = std::make_unique<RustLiteral>(CurrentToken().uinteger.getValue(),
+    term = std::make_unique<RustLiteral>(CurrentToken().uinteger.value(),
                                          std::move(type));
     Advance();
     break;
@@ -1725,7 +1726,7 @@ RustExpressionUP Parser::Term(Status &error) {
     }
     RustTypeExpressionUP type =
         std::make_unique<RustPathTypeExpression>(suffix);
-    term = std::make_unique<RustLiteral>(CurrentToken().dvalue.getValue(),
+    term = std::make_unique<RustLiteral>(CurrentToken().dvalue.value(),
                                          std::move(type));
     Advance();
     break;
@@ -1740,7 +1741,7 @@ RustExpressionUP Parser::Term(Status &error) {
 
   case CHAR:
   case BYTE:
-    term = std::make_unique<RustCharLiteral>(CurrentToken().uinteger.getValue(),
+    term = std::make_unique<RustCharLiteral>(CurrentToken().uinteger.value(),
                                              CurrentToken().kind == BYTE);
     Advance();
     break;
@@ -2032,7 +2033,7 @@ RustTypeExpressionUP Parser::ArrayType(Status &error) {
     return RustTypeExpressionUP();
   }
 
-  uint64_t len = CurrentToken().uinteger.getValue();
+  uint64_t len = CurrentToken().uinteger.value();
   Advance();
 
   if (CurrentToken().kind != ']') {

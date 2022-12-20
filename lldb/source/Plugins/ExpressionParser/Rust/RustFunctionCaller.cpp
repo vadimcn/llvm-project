@@ -34,8 +34,8 @@
 #include "lldb/Target/ThreadPlan.h"
 #include "lldb/Target/ThreadPlanCallFunction.h"
 #include "lldb/Utility/DataExtractor.h"
-#include "lldb/Utility/Log.h"
 #include "lldb/Utility/LLDBLog.h"
+#include "lldb/Utility/Log.h"
 #include "lldb/Utility/State.h"
 
 using namespace lldb_private;
@@ -82,8 +82,8 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   ThreadList::ExpressionExecutionThreadPusher execution_thread_pusher(
       thread_to_use_sp);
 
-  TypeSystemRust *ast = llvm::dyn_cast_or_null<TypeSystemRust>(
-      m_function_return_type.GetTypeSystem());
+  auto ast =
+      m_function_return_type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "not in a Rust context!?");
@@ -116,7 +116,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
 
   // ASTStructExtractor requires the first argument to be the
   // function.
-  if (!AppendType(&code, ast, &name_map, "fn_ptr", m_function_type)) {
+  if (!AppendType(&code, ast.get(), &name_map, "fn_ptr", m_function_type)) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "could not compute Rust type declaration");
     return 1;
@@ -143,7 +143,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
         m_function_type.GetFunctionArgumentTypeAtIndex(i).IsAggregateType();
 
     std::string argname = "__arg_" + std::to_string(i);
-    if (!AppendType(&code, ast, &name_map, argname, arg_type)) {
+    if (!AppendType(&code, ast.get(), &name_map, argname, arg_type)) {
       diagnostic_manager.PutString(eDiagnosticSeverityError,
                                    "could not compute Rust type declaration");
       return 1;
@@ -159,7 +159,7 @@ RustFunctionCaller::CompileFunction(lldb::ThreadSP thread_to_use_sp,
   }
 
   // ASTStructExtractor requires that the last field hold the result.
-  if (!AppendType(&code, ast, &name_map, "result",
+  if (!AppendType(&code, ast.get(), &name_map, "result",
                   m_function_type.GetFunctionReturnType())) {
     diagnostic_manager.PutString(eDiagnosticSeverityError,
                                  "could not compute Rust type declaration");

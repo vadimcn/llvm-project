@@ -64,9 +64,7 @@ bool RustLanguageRuntime::GetDynamicTypeAndAddress(
   value_type = Value::ValueType::Scalar;
 
   CompilerType type = in_value.GetCompilerType();
-  TypeSystemRust *ast =
-      llvm::dyn_cast_or_null<TypeSystemRust>(type.GetTypeSystem());
-
+  auto ast = type.GetTypeSystem().dyn_cast_or_null<TypeSystemRust>();
   if (!ast) {
     return false;
   }
