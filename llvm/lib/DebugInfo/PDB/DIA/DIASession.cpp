@@ -63,10 +63,10 @@ static Error ErrorFromHResult(HRESULT Result, const char *Str, Ts &&... Args) {
 }
 
 static Error LoadDIA(CComPtr<IDiaDataSource> &DiaDataSource) {
-  if (SUCCEEDED(CoCreateInstance(CLSID_DiaSource, nullptr, CLSCTX_INPROC_SERVER,
-                                 IID_IDiaDataSource,
-                                 reinterpret_cast<LPVOID *>(&DiaDataSource))))
-    return Error::success();
+  // if (SUCCEEDED(CoCreateInstance(CLSID_DiaSource, nullptr, CLSCTX_INPROC_SERVER,
+  //                                IID_IDiaDataSource,
+  //                                reinterpret_cast<LPVOID *>(&DiaDataSource))))
+  //   return Error::success();
 
 // If the CoCreateInstance call above failed, msdia*.dll is not registered.
 // Try loading the DLL corresponding to the #included DIA SDK.
