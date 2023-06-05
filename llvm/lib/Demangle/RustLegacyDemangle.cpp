@@ -1,4 +1,5 @@
-//===--- RustLegacyDemangle.cpp ---------------------------------------*- C++ -*-===//
+//===--- RustLegacyDemangle.cpp ---------------------------------------*- C++
+//-*-===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -8,13 +9,17 @@
 //
 // This file defines a demangler for Rust legacy mangled symbols
 //
+// See Rust implementation here:
+// https://github.com/rust-lang/rustc-demangle/blob/af38dc6b06b5665c79a4778268e4faf5decd19df/src/legacy.rs
+//
 //===----------------------------------------------------------------------===//
 
 #include "llvm/Demangle/Demangle.h"
-#include "llvm/Demangle/StringView.h"
+#include "llvm/Demangle/StringViewExtras.h"
 #include "llvm/Demangle/Utility.h"
 
 using llvm::itanium_demangle::OutputBuffer;
+using llvm::itanium_demangle::starts_with;
 
 static inline bool isDigit(const char C) { return '0' <= C && C <= '9'; }
 
@@ -22,37 +27,41 @@ static inline bool isHexDigit(const char C) {
   return ('0' <= C && C <= '9') || ('a' <= C && C <= 'f');
 }
 
-// Prefix is null-terminated
-static bool startsWith(const char *Prefix, const char *Start, const char *End) {
-  const char *P = Prefix;
-  for (const char *M = Start; M < End; ++M, ++P) {
-    if (*P == 0)
-      return true;
-    if (*P != *M)
-      return false;
-  }
-  return *P == 0;
-}
-
-static bool parsePathComponent(const char *M, const char *E,
-                               const char **CompStart, const char **CompEnd) {
-  size_t Len = 0;
-  while (M < E && isDigit(*M)) {
-    Len = Len * 10 + *M - '0';
-    M += 1;
-  }
-  if (Len > 0 && M + Len <= E) {
-    *CompStart = M;
-    *CompEnd = M + Len;
+static bool removeZNPrefix(std::string_view *Mangled) {
+  if (starts_with(*Mangled, "__ZN")) {
+    Mangled->remove_prefix(4);
+    return true;
+  } else if (starts_with(*Mangled, "_ZN")) {
+    Mangled->remove_prefix(3);
+    return true;
+  } else if (starts_with(*Mangled, "ZN")) {
+    Mangled->remove_prefix(2);
     return true;
   }
   return false;
 }
 
-// Check whether M..E looks like a Rust hash
-// i.e. 'h' followed by 16 hex digits.
-static bool isRustHash(const char *M, const char *E) {
-  if (E != M + 17 || M[0] != 'h')
+static bool parsePathComponent(std::string_view Mangled,
+                               std::string_view *Comp = nullptr,
+                               std::string_view *Rest = nullptr) {
+  size_t Len = 0;
+  while (!Mangled.empty() && isDigit(Mangled[0])) {
+    Len = Len * 10 + Mangled[0] - '0';
+    Mangled.remove_prefix(1);
+  }
+  if (Len > 0 && Len <= Mangled.length()) {
+    if (Comp)
+      *Comp = Mangled.substr(0, Len);
+    if (Rest)
+      *Rest = Mangled.substr(Len);
+    return true;
+  }
+  return false;
+}
+
+// Check whether M looks like a Rust hash, i.e. 'h' followed by 16 hex digits.
+static bool isRustHash(std::string_view M) {
+  if (M.length() != 17 || M[0] != 'h')
     return false;
   for (size_t i = 1; i < 17; ++i) {
     if (!isHexDigit(M[i]))
@@ -61,108 +70,92 @@ static bool isRustHash(const char *M, const char *E) {
   return true;
 }
 
-bool llvm::isRustLegacyMangling(const char *MangledName, size_t Length) {
-  if (!startsWith("_ZN", MangledName, MangledName + Length))
+bool llvm::isRustLegacyMangling(std::string_view Mangled) {
+  if (!removeZNPrefix(&Mangled))
     return false;
 
-  const char *M = MangledName + 3;
-  const char *E = MangledName + Length;
-  const char *CompStart = nullptr;
-  const char *CompEnd = nullptr;
-  while (parsePathComponent(M, E, &CompStart, &CompEnd)) {
-    M = CompEnd;
+  std::string_view Comp;
+  while (parsePathComponent(Mangled, &Comp, &Mangled)) {
+    // noop
   }
-  return CompStart && isRustHash(CompStart, CompEnd);
+  return isRustHash(Comp);
 }
 
-char *llvm::rustLegacyDemangle(const char *MangledName) {
-
-  if (MangledName == nullptr) {
+char *llvm::rustLegacyDemangle(std::string_view Mangled) {
+  if (!removeZNPrefix(&Mangled))
     return nullptr;
-  }
-
-  size_t Length = std::strlen(MangledName);
-  if (!startsWith("_ZN", MangledName, MangledName + Length)) {
-    return nullptr;
-  }
 
   OutputBuffer Demangled;
+  std::string_view Comp;
+  while (parsePathComponent(Mangled, &Comp, &Mangled)) {
 
-  const char *M = MangledName + 3;
-  const char *CompStart = nullptr;
-  const char *CompEnd = nullptr;
-  while (parsePathComponent(M, MangledName + Length, &CompStart, &CompEnd)) {
-
-    if (CompEnd < MangledName + Length && CompEnd[0] == 'E' &&
-        isRustHash(CompStart, CompEnd)) {
+    if (!Mangled.empty() && Mangled[0] == 'E' && isRustHash(Comp)) {
       break;
     }
 
     if (!Demangled.empty())
       Demangled << "::";
 
-    M = CompStart;
-    if (startsWith("_$", M, CompEnd))
-      M += 1;
+    if (starts_with(Comp, "_$"))
+      Comp.remove_prefix(1);
 
-    while (M < CompEnd) {
-      if (startsWith("..", M, CompEnd)) {
+    while (!Comp.empty()) {
+      if (starts_with(Comp, "..")) {
         Demangled << "::";
-        M += 2;
+        Comp.remove_prefix(2);
         continue;
-      } else if (M[0] == '$') {
-        if (startsWith("$SP$", M, CompEnd)) {
+      } else if (Comp[0] == '$') {
+        if (starts_with(Comp, "$SP$")) {
           Demangled << '@';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$BP$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$BP$")) {
           Demangled << '*';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$RF$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$RF$")) {
           Demangled << '&';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$LT$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$LT$")) {
           Demangled << '<';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$GT$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$GT$")) {
           Demangled << '>';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$LP$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$LP$")) {
           Demangled << '(';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$RP$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$RP$")) {
           Demangled << ')';
-          M += 4;
+          Comp.remove_prefix(4);
           continue;
-        } else if (startsWith("$C$", M, CompEnd)) {
+        } else if (starts_with(Comp, "$C$")) {
           Demangled << ',';
-          M += 3;
+          Comp.remove_prefix(3);
           continue;
-        } else if (startsWith("$u", M, CompEnd)) {
-          const char *T = M + 2;
+        } else if (starts_with(Comp, "$u")) {
+          Comp.remove_prefix(2);
           uint32_t code = 0;
-          while (T < CompEnd && isHexDigit(*T)) {
-            code = code * 16 + (*T < 'a' ? *T - '0' : *T - 'a' + 0x0A);
-            T += 1;
+          while (!Comp.empty() && isHexDigit(Comp[0])) {
+            code = code * 16 +
+                   (Comp[0] < 'a' ? Comp[0] - '0' : Comp[0] - 'a' + 0x0A);
+            Comp.remove_prefix(1);
           }
-          if (T < CompEnd && *T == '$') {
+          if (!Comp.empty() && Comp[0] == '$') {
             Demangled << static_cast<char>(code);
-            M = T + 1;
+            Comp.remove_prefix(1);
             continue;
           }
         }
       }
 
-      Demangled << *M;
-      M += 1;
+      Demangled << Comp[0];
+      Comp.remove_prefix(1);
     }
-
-    M = CompEnd;
   }
   Demangled << '\0';
 

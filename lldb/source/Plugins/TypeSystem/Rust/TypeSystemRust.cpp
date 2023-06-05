@@ -837,11 +837,11 @@ lldb::TypeSystemSP TypeSystemRust::CreateInstance(lldb::LanguageType language,
     std::shared_ptr<TypeSystemRust> astc;
     if (module) {
       arch = module->GetArchitecture();
-      astc = std::shared_ptr<TypeSystemRust>(new TypeSystemRust);
+      astc = std::make_shared<TypeSystemRust>();
     } else if (target) {
       arch = target->GetArchitecture();
-      astc = std::shared_ptr<TypeSystemRustForExpr>(
-          new TypeSystemRustForExpr(target->shared_from_this()));
+      astc =
+          std::make_shared<TypeSystemRustForExpr>(target->shared_from_this());
     }
 
     if (arch.IsValid()) {
@@ -978,6 +978,11 @@ bool TypeSystemRust::IsFunctionPointerType(lldb::opaque_compiler_type_t type) {
     return false;
   }
   return pointee.IsFunctionType();
+}
+
+bool TypeSystemRust::IsMemberFunctionPointerType(
+    lldb::opaque_compiler_type_t type) {
+  return false;
 }
 
 bool TypeSystemRust::IsBlockPointerType(
@@ -1495,7 +1500,8 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
           language_flags);
     } else {
       child_is_deref_of_parent = true;
-      const char *parent_name = valobj ? valobj->GetName().GetCString() : NULL;
+      const char *parent_name =
+          valobj ? valobj->GetName().GetCString() : nullptr;
       if (parent_name) {
         child_name.assign(1, '*');
         child_name += parent_name;
@@ -1504,7 +1510,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
       // We have a pointer to an simple type
       if (idx == 0 && pointee.GetCompleteType()) {
         std::optional<uint64_t> size = pointee.GetByteSize(
-            exe_ctx ? exe_ctx->GetBestExecutionContextScope() : NULL);
+            exe_ctx ? exe_ctx->GetBestExecutionContextScope() : nullptr);
         if (!size)
           return {};
         child_byte_size = *size;
@@ -1520,7 +1526,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
         ::snprintf(element_name, sizeof(element_name), "[%zu]", idx);
         child_name.assign(element_name);
         std::optional<uint64_t> size = element_type.GetByteSize(
-            exe_ctx ? exe_ctx->GetBestExecutionContextScope() : NULL);
+            exe_ctx ? exe_ctx->GetBestExecutionContextScope() : nullptr);
         if (!size)
           return {};
         child_byte_size = *size;
@@ -1542,7 +1548,7 @@ CompilerType TypeSystemRust::GetChildCompilerTypeAtIndex(
 // and member member names in "clang_type" only, not descendants.
 uint32_t
 TypeSystemRust::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
-                                        const char *name,
+                                        llvm::StringRef name,
                                         bool omit_empty_base_classes) {
   if (!type || !GetCompleteType(type))
     return UINT_MAX;
@@ -1568,7 +1574,7 @@ TypeSystemRust::GetIndexOfChildWithName(lldb::opaque_compiler_type_t type,
 // vector<vector<uint32_t>>
 // so we catch all names that match a given child name, not just the first.
 size_t TypeSystemRust::GetIndexOfChildMemberWithName(
-    lldb::opaque_compiler_type_t type, const char *name,
+    lldb::opaque_compiler_type_t type, llvm::StringRef name,
     bool omit_empty_base_classes, std::vector<uint32_t> &child_indexes) {
   uint32_t index = GetIndexOfChildWithName(type, name, omit_empty_base_classes);
   if (index == UINT_MAX)
@@ -1583,7 +1589,7 @@ size_t TypeSystemRust::GetIndexOfChildMemberWithName(
 #define DEPTH_INCREMENT 2
 
 void TypeSystemRust::DumpValue(
-    lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx, Stream *s,
+    lldb::opaque_compiler_type_t type, ExecutionContext *exe_ctx, Stream &s,
     lldb::Format format, const DataExtractor &data,
     lldb::offset_t data_byte_offset, size_t data_byte_size,
     uint32_t bitfield_bit_size, uint32_t bitfield_bit_offset, bool show_types,
@@ -1592,7 +1598,7 @@ void TypeSystemRust::DumpValue(
   assert(false && "Not implemented");
 }
 
-bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
+bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream &s,
                                    lldb::Format format,
                                    const DataExtractor &data,
                                    lldb::offset_t byte_offset, size_t byte_size,
@@ -1615,7 +1621,7 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
         return false;
 
       return typedef_compiler_type.DumpTypeValue(
-          s,
+          &s,
           format,             // The format with which to display the element
           data,               // Data buffer containing all bytes for this type
           byte_offset,        // Offset into "data" where to grab value from
@@ -1641,11 +1647,11 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
 
         std::string name;
         if (clike->FindName(value, name)) {
-          s->Printf("%s::%s", clike->Name().AsCString(), name.c_str());
+          s.Printf("%s::%s", clike->Name().AsCString(), name.c_str());
         } else {
           // If the value couldn't be found, then something went wrong
           // we should inform the user.
-          s->Printf("(invalid enum value) %" PRIu64, value);
+          s.Printf("(invalid enum value) %" PRIu64, value);
         }
         return true;
       }
@@ -1656,29 +1662,29 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
               &byte_offset, byte_size, bitfield_bit_size, bitfield_bit_offset);
           switch (value) {
           case '\n':
-            s->PutCString("'\\n'");
+            s.PutCString("'\\n'");
             break;
           case '\r':
-            s->PutCString("'\\r'");
+            s.PutCString("'\\r'");
             break;
           case '\t':
-            s->PutCString("'\\t'");
+            s.PutCString("'\\t'");
             break;
           case '\\':
-            s->PutCString("'\\\\'");
+            s.PutCString("'\\\\'");
             break;
           case '\0':
-            s->PutCString("'\\0'");
+            s.PutCString("'\\0'");
             break;
           case '\'':
-            s->PutCString("'\\''");
+            s.PutCString("'\\''");
             break;
 
           default:
             if (value < 128 && isprint(value)) {
-              s->Printf("'%c'", char(value));
+              s.Printf("'%c'", char(value));
             } else {
-              s->Printf("'\\u{%x}'", unsigned(value));
+              s.Printf("'\\u{%x}'", unsigned(value));
             }
             break;
           }
@@ -1737,7 +1743,7 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
       byte_size = 4;
       break;
     }
-    return DumpDataExtractor(data, s, byte_offset, format, byte_size,
+    return DumpDataExtractor(data, &s, byte_offset, format, byte_size,
                              item_count, UINT32_MAX, LLDB_INVALID_ADDRESS,
                              bitfield_bit_size, bitfield_bit_offset, exe_scope);
   }
@@ -1745,7 +1751,7 @@ bool TypeSystemRust::DumpTypeValue(lldb::opaque_compiler_type_t type, Stream *s,
 }
 
 void TypeSystemRust::DumpSummary(lldb::opaque_compiler_type_t type,
-                                 ExecutionContext *exe_ctx, Stream *s,
+                                 ExecutionContext *exe_ctx, Stream &s,
                                  const DataExtractor &data,
                                  lldb::offset_t data_offset,
                                  size_t data_byte_size) {
@@ -1756,11 +1762,11 @@ void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
                                          lldb::DescriptionLevel level) {
   // Dump to stdout
   StreamFile s(stdout, false);
-  DumpTypeDescription(type, &s);
+  DumpTypeDescription(type, s);
 }
 
 void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
-                                         Stream *s,
+                                         Stream &s,
                                          lldb::DescriptionLevel level) {
   if (!type)
     return;
@@ -1768,41 +1774,41 @@ void TypeSystemRust::DumpTypeDescription(lldb::opaque_compiler_type_t type,
   RustType *t = static_cast<RustType *>(type);
 
   if (RustAggregateBase *agg = t->AsAggregate()) {
-    s->PutCString(agg->Tag());
+    s.PutCString(agg->Tag());
     const char *name = agg->TagName();
-    s->PutCString(name);
+    s.PutCString(name);
     if (*name) {
-      s->PutCString(" ");
+      s.PutCString(" ");
     }
-    s->PutCString(agg->Opener());
+    s.PutCString(agg->Opener());
     if (agg->FieldCount() == 0) {
-      s->PutCString(agg->Closer());
+      s.PutCString(agg->Closer());
       return;
     }
-    s->IndentMore();
+    s.IndentMore();
     // A trailing comma looks weird for tuples, so we keep track and
     // don't emit it.
     bool first = true;
     for (auto &&field : *agg) {
       if (!first) {
-        s->PutChar(',');
+        s.PutChar(',');
       }
       first = false;
-      s->PutChar('\n');
-      s->Indent();
+      s.PutChar('\n');
+      s.Indent();
       if (!field.m_name.IsEmpty()) {
-        s->PutCString(field.m_name.AsCString());
-        s->PutCString(": ");
+        s.PutCString(field.m_name.AsCString());
+        s.PutCString(": ");
       }
-      s->PutCString(field.m_type.GetTypeName().AsCString());
+      s.PutCString(field.m_type.GetTypeName().AsCString());
     }
-    s->IndentLess();
-    s->PutChar('\n');
-    s->Indent(agg->Closer());
+    s.IndentLess();
+    s.PutChar('\n');
+    s.Indent(agg->Closer());
     return;
   }
 
-  s->PutCString(name.AsCString());
+  s.PutCString(name.AsCString());
 }
 
 CompilerType TypeSystemRust::CacheType(RustType *new_type) {
@@ -2010,7 +2016,7 @@ void TypeSystemRust::FinishAggregateInitialization(const CompilerType &type) {
 
 DWARFASTParser *TypeSystemRust::GetDWARFParser() {
   if (!m_dwarf_ast_parser_ap)
-    m_dwarf_ast_parser_ap.reset(new DWARFASTParserRust(*this));
+    m_dwarf_ast_parser_ap = std::make_unique<DWARFASTParserRust>(*this);
   return m_dwarf_ast_parser_ap.get();
 }
 
@@ -2057,15 +2063,18 @@ TypeSystemRust::DeclContextGetScopeQualifiedName(void *opaque_decl_ctx) {
   return dc->QualifiedName();
 }
 
-bool TypeSystemRust::DeclContextIsClassMethod(
-    void *opaque_decl_ctx, lldb::LanguageType *language_ptr,
-    bool *is_instance_method_ptr, ConstString *language_object_name_ptr) {
+bool TypeSystemRust::DeclContextIsClassMethod(void *opaque_decl_ctx) {
   return false;
 }
 
 bool TypeSystemRust::DeclContextIsContainedInLookup(
     void *opaque_decl_ctx, void *other_opaque_decl_ctx) {
   return opaque_decl_ctx == other_opaque_decl_ctx;
+}
+
+lldb::LanguageType
+TypeSystemRust::DeclContextGetLanguage(void *opaque_decl_ctx) {
+  return lldb::eLanguageTypeRust;
 }
 
 std::vector<CompilerDecl> TypeSystemRust::DeclContextFindDeclByName(
@@ -2087,7 +2096,7 @@ std::vector<CompilerDecl> TypeSystemRust::DeclContextFindDeclByName(
 
 CompilerDeclContext TypeSystemRust::GetTranslationUnitDecl() {
   if (!m_tu_decl) {
-    m_tu_decl.reset(new RustDeclContext(ConstString(""), nullptr));
+    m_tu_decl = std::make_unique<RustDeclContext>(ConstString(""), nullptr);
   }
   return CompilerDeclContext(this, m_tu_decl.get());
 }

@@ -16,7 +16,6 @@
 #include "lldb/lldb-private.h"
 
 #include "lldb/Utility/Stream.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -74,8 +73,8 @@ void PrintTokenKind(Stream &stream, int kind);
 struct Token {
   int kind;
 
-  llvm::Optional<uint64_t> uinteger;
-  llvm::Optional<double> dvalue;
+  std::optional<uint64_t> uinteger;
+  std::optional<double> dvalue;
   // This can be NULL if no suffix was specified.
   const char *number_suffix = nullptr;
   std::string str;

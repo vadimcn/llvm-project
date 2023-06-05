@@ -52,7 +52,7 @@ Mangled::ManglingScheme Mangled::GetManglingScheme(llvm::StringRef const name) {
     return Mangled::eManglingSchemeD;
 
   if (name.startswith("_Z")) {
-    if (llvm::isRustLegacyMangling(name.data(), name.size())) 
+    if (llvm::isRustLegacyMangling(name)) 
       return Mangled::eManglingSchemeRustLegacy;
     else
       return Mangled::eManglingSchemeItanium;

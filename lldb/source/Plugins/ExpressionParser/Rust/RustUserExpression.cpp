@@ -52,7 +52,7 @@ RustUserExpression::DoExecute(DiagnosticManager &diagnostic_manager,
     return lldb::eExpressionDiscarded;
   }
 
-  result.reset(new ExpressionVariable(ExpressionVariable::eKindRust));
+  result.reset(new ExpressionVariable());
   result->m_live_sp = result->m_frozen_sp = value;
   result->m_flags |= ExpressionVariable::EVIsProgramReference;
   Target *target = exe_ctx.GetTargetPtr();

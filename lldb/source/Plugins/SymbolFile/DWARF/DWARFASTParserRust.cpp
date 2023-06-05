@@ -39,7 +39,7 @@ using namespace lldb_private::dwarf;
 // A way to iterate over DIE attrs.
 class IterableDIEAttrs {
 public:
-  IterableDIEAttrs(const DWARFDIE &die) { m_size = die.GetAttributes(m_attrs); }
+  IterableDIEAttrs(const DWARFDIE &die) { m_attrs = die.GetAttributes(); }
 
   IterableDIEAttrs(const IterableDIEAttrs &) = delete;
   IterableDIEAttrs &operator=(const IterableDIEAttrs &) = delete;
@@ -82,10 +82,9 @@ public:
 
   iterator begin() const { return iterator(this, 0); }
 
-  iterator end() const { return iterator(this, m_size); }
+  iterator end() const { return iterator(this, m_attrs.Size()); }
 
 private:
-  size_t m_size;
   DWARFAttributes m_attrs;
 };
 
@@ -160,7 +159,7 @@ ConstString DWARFASTParserRust::FullyQualify(const ConstString &name,
 TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log,
                                            const DWARFDIE &die) {
   lldb::user_id_t encoding_uid = LLDB_INVALID_UID;
-  const char *type_name_cstr = NULL;
+  const char *type_name_cstr = nullptr;
   ConstString type_name_const_str;
   uint64_t byte_size = 0;
   uint64_t encoding = 0;
@@ -180,6 +179,8 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log,
       break;
     case DW_AT_type:
       encoding_uid = value.second.Reference().GetID();
+      break;
+    default:
       break;
     }
   }
@@ -250,7 +251,7 @@ TypeSP DWARFASTParserRust::ParseSimpleType(lldb_private::Log *log,
     assert(0);
   }
 
-  return dwarf->MakeType(die.GetID(), type_name_const_str, byte_size, NULL,
+  return dwarf->MakeType(die.GetID(), type_name_const_str, byte_size, nullptr,
                          encoding_uid, encoding_data_type, Declaration(),
                          compiler_type, resolve_state);
 }
@@ -262,6 +263,8 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
     switch (value.first) {
     case DW_AT_type:
       type_die_id = value.second.Reference().GetID();
+      break;
+    default:
       break;
     }
   }
@@ -292,7 +295,7 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
   ConstString type_name_const_str = compiler_type.GetTypeName();
   TypeSP type_sp =
       dwarf->MakeType(die.GetID(), type_name_const_str,
-                      element_type->GetByteSize(NULL).value_or(0), NULL,
+                      element_type->GetByteSize(nullptr).value_or(0), nullptr,
                       type_die_id, Type::eEncodingIsUID, Declaration(),
                       compiler_type, Type::ResolveState::Full);
   type_sp->SetEncodingType(element_type);
@@ -302,13 +305,16 @@ TypeSP DWARFASTParserRust::ParseArrayType(const DWARFDIE &die) {
 TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
   clang::StorageClass storage =
       clang::SC_None; //, Extern, Static, PrivateExtern
-  const char *type_name_cstr = NULL;
+  const char *type_name_cstr = nullptr;
   ConstString type_name_const_str;
   Declaration decl;
 
   CompilerType return_type;
   for (auto &&attr : IterableDIEAttrs(die)) {
     switch (attr.first) {
+    default:
+      break;
+
     case DW_AT_name:
       type_name_cstr = attr.second.AsCString();
       type_name_const_str.SetCString(type_name_cstr);
@@ -364,7 +370,7 @@ TypeSP DWARFASTParserRust::ParseFunctionType(const DWARFDIE &die) {
       std::move(template_params));
 
   TypeSP type_sp = dwarf->MakeType(
-      die.GetID(), type_name_const_str, 0, NULL, LLDB_INVALID_UID,
+      die.GetID(), type_name_const_str, 0, nullptr, LLDB_INVALID_UID,
       Type::eEncodingIsUID, &decl, compiler_type, Type::ResolveState::Full);
 
   return type_sp;
@@ -572,17 +578,19 @@ std::vector<DWARFASTParserRust::Field> DWARFASTParserRust::ParseFields(
             uint32_t block_offset =
                 attr.second.BlockData() - debug_info_data.GetDataStart();
             if (DWARFExpression::Evaluate(
-                    NULL, // ExecutionContext *
-                    NULL, // RegisterContext *
+                    nullptr, // ExecutionContext *
+                    nullptr, // RegisterContext *
                     module_sp,
                     DataExtractor(debug_info_data, block_offset, block_length),
-                    die.GetCU(), eRegisterKindDWARF, &initialValue, NULL,
-                    memberOffset, NULL)) {
-              new_field.byte_offset = memberOffset.ResolveValue(NULL).UInt();
+                    die.GetCU(), eRegisterKindDWARF, &initialValue, nullptr,
+                    memberOffset, nullptr)) {
+              new_field.byte_offset = memberOffset.ResolveValue(nullptr).UInt();
             }
           } else {
             new_field.byte_offset = attr.second.Unsigned();
           }
+          break;
+        default:
           break;
         }
       }
@@ -661,7 +669,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
   bool byte_size_valid = false;
   uint64_t byte_size = 0;
-  const char *type_name_cstr = NULL;
+  const char *type_name_cstr = nullptr;
   ConstString type_name_const_str;
   SymbolFileDWARF *dwarf = die.GetDWARF();
   Declaration decl;
@@ -676,6 +684,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
     case DW_AT_byte_size:
       byte_size = attr.second.Unsigned();
       byte_size_valid = true;
+      break;
+
+    default:
       break;
     }
   }
@@ -797,9 +808,9 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
                                              has_discriminant);
   }
 
-  type_sp = dwarf->MakeType(die.GetID(), type_name_const_str, byte_size, NULL,
-                            LLDB_INVALID_UID, Type::eEncodingIsUID, &decl,
-                            compiler_type, Type::ResolveState::Forward);
+  type_sp = dwarf->MakeType(die.GetID(), type_name_const_str, byte_size,
+                            nullptr, LLDB_INVALID_UID, Type::eEncodingIsUID,
+                            &decl, compiler_type, Type::ResolveState::Forward);
 
   // Now add the fields.
   int fieldno = 0;
@@ -851,7 +862,7 @@ TypeSP DWARFASTParserRust::ParseStructureType(const DWARFDIE &die) {
 
 TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
                                           const DWARFDIE &die) {
-  const char *type_name_cstr = NULL;
+  const char *type_name_cstr = nullptr;
   ConstString type_name_const_str;
   SymbolFileDWARF *dwarf = die.GetDWARF();
   CompilerType underlying_type;
@@ -872,6 +883,9 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
 
     case DW_AT_byte_size:
       byte_size = attr.second.Unsigned();
+      break;
+
+    default:
       break;
     }
   }
@@ -908,6 +922,8 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
         saw_value = true;
         value = attr.second.Unsigned();
         break;
+      default:
+        break;
       }
     }
 
@@ -926,7 +942,7 @@ TypeSP DWARFASTParserRust::ParseCLikeEnum(lldb_private::Log *log,
   CompilerType compiler_type = m_ast.CreateCLikeEnumType(
       type_name_const_str, underlying_type, std::move(values));
   TypeSP type_sp = dwarf->MakeType(
-      die.GetID(), type_name_const_str, 0, NULL, LLDB_INVALID_UID,
+      die.GetID(), type_name_const_str, 0, nullptr, LLDB_INVALID_UID,
       Type::eEncodingIsUID, &decl, compiler_type, Type::ResolveState::Full);
 
   return type_sp;
@@ -955,7 +971,7 @@ DWARFASTParserRust::ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
 
     Type *type_ptr = dwarf->m_die_to_type.lookup(die.GetDIE());
     TypeList &type_list = dwarf->GetTypeList();
-    if (type_ptr == NULL) {
+    if (type_ptr == nullptr) {
       if (type_is_new_ptr)
         *type_is_new_ptr = true;
 
@@ -1005,17 +1021,17 @@ DWARFASTParserRust::ParseTypeFromDWARF(const lldb_private::SymbolContext &sc,
             SymbolFileDWARF::GetParentSymbolContextDIE(die);
         dw_tag_t sc_parent_tag = sc_parent_die.Tag();
 
-        SymbolContextScope *symbol_context_scope = NULL;
+        SymbolContextScope *symbol_context_scope = nullptr;
         if (sc_parent_tag == DW_TAG_compile_unit) {
           symbol_context_scope = sc.comp_unit;
-        } else if (sc.function != NULL && sc_parent_die) {
+        } else if (sc.function != nullptr && sc_parent_die) {
           symbol_context_scope =
               sc.function->GetBlock(true).FindBlockByID(sc_parent_die.GetID());
-          if (symbol_context_scope == NULL)
+          if (symbol_context_scope == nullptr)
             symbol_context_scope = sc.function;
         }
 
-        if (symbol_context_scope != NULL) {
+        if (symbol_context_scope != nullptr) {
           type_sp->SetSymbolContextScope(symbol_context_scope);
         }
 
@@ -1043,14 +1059,14 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(
     const lldb_private::AddressRange &func_range) {
   assert(func_range.GetBaseAddress().IsValid());
   DWARFRangeList func_ranges;
-  const char *name = NULL;
-  const char *mangled = NULL;
-  int decl_file = 0;
-  int decl_line = 0;
-  int decl_column = 0;
-  int call_file = 0;
-  int call_line = 0;
-  int call_column = 0;
+  const char *name = nullptr;
+  const char *mangled = nullptr;
+  std::optional<int> decl_file = 0;
+  std::optional<int> decl_line = 0;
+  std::optional<int> decl_column = 0;
+  std::optional<int> call_file = 0;
+  std::optional<int> call_line = 0;
+  std::optional<int> call_column = 0;
   DWARFExpressionList frame_base;
 
   assert(die.Tag() == DW_TAG_subprogram);
@@ -1060,37 +1076,31 @@ Function *DWARFASTParserRust::ParseFunctionFromDWARF(
                                &frame_base)) {
     Mangled func_name;
     if (mangled)
-      func_name.SetValue(ConstString(mangled), true);
+      func_name.SetValue(ConstString(mangled));
     else
-      func_name.SetValue(ConstString(name), false);
-
-    FunctionSP func_sp;
-    std::unique_ptr<Declaration> decl_ap;
-    if (decl_file != 0 || decl_line != 0 || decl_column != 0)
-      decl_ap.reset(new Declaration(
-          comp_unit.GetSupportFiles().GetFileSpecAtIndex(decl_file), decl_line,
-          decl_column));
+      func_name.SetValue(ConstString(name));
 
     SymbolFileDWARF *dwarf = die.GetDWARF();
     // Supply the type _only_ if it has already been parsed
     Type *func_type = dwarf->m_die_to_type.lookup(die.GetDIE());
 
-    assert(func_type == NULL || func_type != DIE_IS_BEING_PARSED);
+    assert(func_type == nullptr || func_type != DIE_IS_BEING_PARSED);
 
     const user_id_t func_user_id = die.GetID();
-    func_sp.reset(new Function(&comp_unit,
-                               func_user_id, // UserID is the DIE offset
-                               func_user_id, func_name, func_type,
-                               func_range)); // first address range
+    FunctionSP func_sp =
+        std::make_shared<Function>(&comp_unit,
+                                   func_user_id, // UserID is the DIE offset
+                                   func_user_id, func_name, func_type,
+                                   func_range); // first address range
 
-    if (func_sp.get() != NULL) {
+    if (func_sp.get() != nullptr) {
       if (frame_base.IsValid())
         func_sp->GetFrameBaseExpression() = frame_base;
       comp_unit.AddFunction(func_sp);
       return func_sp.get();
     }
   }
-  return NULL;
+  return nullptr;
 }
 
 lldb_private::CompilerDeclContext
