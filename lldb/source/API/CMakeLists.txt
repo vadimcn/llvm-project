@@ -160,10 +160,8 @@ if (NOT LLDB_ENABLE_DYNAMIC_SCRIPTINTERPRETERS)
   endif()
 endif()
 
-set_target_properties(liblldb
-  PROPERTIES
-  VERSION ${LLDB_VERSION}
-)
+set_property(TARGET liblldb PROPERTY VERSION)
+set_property(TARGET liblldb PROPERTY SOVERSION)
 
 target_compile_definitions(liblldb PRIVATE LLDB_IN_LIBLLDB)
 
