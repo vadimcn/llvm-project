@@ -51,16 +51,19 @@ bool llvm::nonMicrosoftDemangle(std::string_view MangledName,
                                 std::string &Result, bool CanHaveLeadingDot,
                                 bool ParseParams) {
   char *Demangled = nullptr;
-
+  
   // Do not consider the dot prefix as part of the demangled symbol name.
   if (CanHaveLeadingDot && MangledName.size() > 0 && MangledName[0] == '.') {
     MangledName.remove_prefix(1);
     Result = ".";
   }
 
-  if (isItaniumEncoding(MangledName))
-    Demangled = itaniumDemangle(MangledName, ParseParams);
-  else if (isRustEncoding(MangledName))
+  if (isItaniumEncoding(MangledName)) {
+    if (isRustLegacyEncoding(MangledName))
+      Demangled = rustLegacyDemangle(MangledName);
+    else
+      Demangled = itaniumDemangle(MangledName, ParseParams);
+  } else if (isRustEncoding(MangledName))
     Demangled = rustDemangle(MangledName);
   else if (isDLangEncoding(MangledName))
     Demangled = dlangDemangle(MangledName);

@@ -60,8 +60,12 @@ Mangled::ManglingScheme Mangled::GetManglingScheme(llvm::StringRef const name) {
       return Mangled::eManglingSchemeD;
   }
 
-  if (name.starts_with("_Z"))
-    return Mangled::eManglingSchemeItanium;
+  if (name.starts_with("_Z")) {
+    if (llvm::isRustLegacyEncoding(name))
+      return Mangled::eManglingSchemeRustLegacy;
+    else
+      return Mangled::eManglingSchemeItanium;
+  }
 
   // ___Z is a clang extension of block invocations
   if (name.starts_with("___Z"))
@@ -197,6 +201,20 @@ GetItaniumDemangledStr(const char *M) {
   return {demangled_cstr, std::move(info)};
 }
 
+static char *GetRustLegacyDemangledStr(llvm::StringRef M) {
+  char *demangled_cstr = llvm::rustLegacyDemangle(M);
+
+  if (Log *log = GetLog(LLDBLog::Demangle)) {
+    if (demangled_cstr && demangled_cstr[0])
+      LLDB_LOG(log, "demangled rustlegacy: {0} -> \"{1}\"", M, demangled_cstr);
+    else
+      LLDB_LOG(log, "demangled rustlegacy: {0} -> error: failed to demangle",
+               static_cast<std::string_view>(M));
+  }
+
+  return demangled_cstr;
+}
+
 static char *GetRustV0DemangledStr(llvm::StringRef M) {
   char *demangled_cstr = llvm::rustDemangle(M);
 
@@ -274,6 +292,7 @@ bool Mangled::GetRichManglingInfo(RichManglingContext &context,
     }
   }
 
+  case eManglingSchemeRustLegacy:
   case eManglingSchemeRustV0:
   case eManglingSchemeD:
   case eManglingSchemeSwift:
@@ -324,6 +343,9 @@ ConstString Mangled::GetDemangledNameImpl(bool force) const {
     m_demangled_info.emplace(std::move(demangled.second));
     break;
   }
+  case eManglingSchemeRustLegacy:
+    demangled_name = GetRustLegacyDemangledStr(m_mangled);
+    break;
   case eManglingSchemeRustV0:
     demangled_name = GetRustV0DemangledStr(m_mangled);
     break;

@@ -1297,7 +1297,7 @@ SBWatchpoint SBTarget::FindWatchpointByID(lldb::watch_id_t wp_id) {
 lldb::SBWatchpoint SBTarget::WatchAddress(lldb::addr_t addr, size_t size,
                                           bool read, bool modify,
                                           SBError &error) {
-  LLDB_INSTRUMENT_VA(this, addr, size, read, write, error);
+  LLDB_INSTRUMENT_VA(this, addr, size, read, modify, error);
 
   SBWatchpointOptions options;
   options.SetWatchpointTypeRead(read);
