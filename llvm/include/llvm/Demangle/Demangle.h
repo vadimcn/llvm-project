@@ -58,6 +58,12 @@ char *microsoftDemangle(std::string_view mangled_name, size_t *n_read,
 std::optional<size_t>
 getArm64ECInsertionPointInMangledName(std::string_view MangledName);
 
+// A quick check whether this is a Rust legacy mangled symbol.
+bool isRustLegacyEncoding(std::string_view MangledName);
+
+// Demangles a Rust legacy mangled symbol.
+char *rustLegacyDemangle(std::string_view MangledName);
+
 // Demangles a Rust v0 mangled symbol.
 char *rustDemangle(std::string_view MangledName);
 
