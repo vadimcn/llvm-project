@@ -209,6 +209,12 @@ ProcessLauncherWindows::LaunchProcess(const ProcessLaunchInfo &launch_info,
            pty_mode == PseudoConsole::Mode::None)
     flags |= CREATE_NEW_CONSOLE;
 
+  if (launch_info.GetFlags().Test(eLaunchFlagDisableSTDIO))
+    flags |= DETACHED_PROCESS;
+
+  if (launch_info.GetFlags().Test(eLaunchFlagLaunchInSeparateProcessGroup))
+    flags |= CREATE_NEW_PROCESS_GROUP;
+
   if (launch_info.GetFlags().Test(eLaunchFlagDebug))
     flags |= DEBUG_ONLY_THIS_PROCESS;
 
@@ -366,7 +372,7 @@ HANDLE ProcessLauncherWindows::GetStdioHandle(const llvm::StringRef path,
     flags = FILE_FLAG_WRITE_THROUGH;
     [[fallthrough]];
   case STDOUT_FILENO:
-    access = GENERIC_WRITE;
+    access = GENERIC_READ | GENERIC_WRITE;
     create = CREATE_ALWAYS;
     break;
   default:
