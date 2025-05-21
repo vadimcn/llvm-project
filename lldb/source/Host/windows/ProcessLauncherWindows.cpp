@@ -216,7 +216,7 @@ ProcessLauncherWindows::GetStdioHandle(const ProcessLaunchInfo &launch_info,
     flags = FILE_ATTRIBUTE_READONLY;
   }
   if (fd == STDOUT_FILENO || fd == STDERR_FILENO) {
-    access = GENERIC_WRITE;
+    access = GENERIC_READ | GENERIC_WRITE;
     create = CREATE_ALWAYS;
     if (fd == STDERR_FILENO)
       flags = FILE_FLAG_WRITE_THROUGH;
