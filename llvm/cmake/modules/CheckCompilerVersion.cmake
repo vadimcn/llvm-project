@@ -85,7 +85,7 @@ int main() { return 0; }
 "
       LLVM_LIBSTDCXX_MIN)
     if(NOT LLVM_LIBSTDCXX_MIN)
-      message(FATAL_ERROR "libstdc++ version must be at least ${GCC_MIN}.")
+      message(ERROR "libstdc++ version must be at least ${GCC_MIN}.")
     endif()
     check_cxx_source_compiles("
 #include <iosfwd>
@@ -101,7 +101,7 @@ int main() { return 0; }
       if(LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN)
         message(WARNING "libstdc++ version should be at least ${LIBSTDCXX_SOFT_ERROR} because LLVM will soon use new C++ features which your toolchain version doesn't support. Ignoring because you've set LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
       else()
-        message(FATAL_ERROR "libstdc++ version should be at least ${LIBSTDCXX_SOFT_ERROR} because LLVM will soon use new C++ features which your toolchain version doesn't support. You can temporarily opt out using LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
+        message(ERROR "libstdc++ version should be at least ${LIBSTDCXX_SOFT_ERROR} because LLVM will soon use new C++ features which your toolchain version doesn't support. You can temporarily opt out using LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN, but very soon your toolchain won't be supported.")
       endif()
     endif()
     set(CMAKE_REQUIRED_FLAGS ${OLD_CMAKE_REQUIRED_FLAGS})
